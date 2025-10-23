@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soteria - Security Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="./style.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@perawallet/connect@1.3.4/dist/index.umd.min.js"></script>
+    <script src="https://unpkg.com/algosdk@2.7.0/dist/browser/algosdk.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="container-fluid p-3 p-md-4">
+        <header class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <i class="bi bi-shield-lock-fill text-info" style="font-size: 2.5rem;"></i>
+                <div>
+                    <h1 class="fw-bold mb-0" style="font-size: 2rem;">Soteria</h1>
+                    <p class="text-secondary mb-0 small">Blockchain Security System</p>
+                </div>
+            </div>
+            <button id="connect-wallet-btn" class="btn btn-info fw-semibold px-4">
+                <i class="bi bi-wallet2 me-2"></i>Connect Wallet
+            </button>
+        </header>
+
+        <main class="row g-4">
+            <div class="col-lg-4">
+                <div class="vstack gap-4">
+                    <!-- Lock Control -->
+                    <div class="card glass-card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3">
+                                <i class="bi bi-door-closed me-2"></i>Main Entrance
+                            </h2>
+                            <div class="lock-display">
+                                <div class="d-flex align-items-center justify-content-between position-relative">
+                                    <div>
+                                        <p class="fw-bold fs-4 mb-1">Smart Lock</p>
+                                        <p id="lock-status-text" class="mb-0 d-flex align-items-center">
+                                            <span class="status-indicator bg-danger"></span>
+                                            <span class="fw-semibold">Locked</span>
+                                        </p>
+                                    </div>
+                                    <div id="lock-icon" class="lock-icon-wrapper locked">
+                                        <i class="bi bi-lock-fill" style="font-size: 2rem;"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2 mt-4">
+                                <button id="unlock-btn" class="btn btn-success btn-lg">
+                                    <i class="bi bi-unlock me-2"></i>Unlock Door
+                                </button>
+                                <button id="lock-btn" class="btn btn-danger btn-lg">
+                                    <i class="bi bi-lock me-2"></i>Lock Door
+                                </button>
+                            </div>
+                            <div id="info-alert" class="mt-3" style="min-height: 40px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Guest Keys -->
+                    <div class="card glass-card">
+                        <div class="card-body">
+                            <h2 class="h5 fw-bold mb-3">
+                                <i class="bi bi-key me-2"></i>Guest Access (NFT Keys)
+                            </h2>
+                            <div id="guest-key-list" class="scrollbar-custom" style="max-height: 400px; overflow-y: auto;">
+                                <p class="text-secondary text-center py-4">No guest keys created yet</p>
+                            </div>
+                            <div class="d-grid mt-3">
+                                <button id="create-key-btn" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#createKeyModal">
+                                    <i class="bi bi-plus-circle me-2"></i>Create New Guest Key
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                <div class="card glass-card h-100">
+                    <div class="card-body d-flex flex-column">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+                            <h2 class="h5 fw-bold mb-0">
+                                <i class="bi bi-journal-text me-2"></i>Immutable Activity Log
+                            </h2>
+                            <span class="badge network-badge">
+                                <i class="bi bi-link-45deg"></i> Algorand TestNet
+                            </span>
+                        </div>
+                        <div id="log-container" class="flex-grow-1 scrollbar-custom" style="overflow-y: auto; max-height: 75vh;">
+                            <div id="log-placeholder" class="text-center" style="margin-top: 20vh;">
+                                <i class="bi bi-wallet2" style="font-size: 3rem; opacity: 0.3;"></i>
+                                <p class="text-secondary mt-3">Connect your wallet to view activity</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create Key Modal -->
+    <div class="modal fade" id="createKeyModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-key me-2"></i>Create Guest Access NFT
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="create-key-form">
+                        <div class="mb-3">
+                            <label for="key-name" class="form-label fw-semibold">
+                                <i class="bi bi-tag me-1"></i>Key Name / Role
+                            </label>
+                            <input type="text" class="form-control" id="key-name" placeholder="e.g., Dog Walker, Plumber" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="recipient-wallet" class="form-label fw-semibold">
+                                <i class="bi bi-wallet2 me-1"></i>Recipient's Algorand Wallet
+                            </label>
+                            <input type="text" class="form-control" id="recipient-wallet" placeholder="Paste wallet address" required>
+                            <div class="form-text">The wallet address that will receive access</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-calendar-range me-1"></i>Access Period
+                            </label>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label for="start-date" class="form-label small text-secondary">Start Time</label>
+                                    <input type="datetime-local" class="form-control" id="start-date" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="end-date" class="form-label small text-secondary">End Time</label>
+                                    <input type="datetime-local" class="form-control" id="end-date" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 justify-content-end">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-info">
+                                <i class="bi bi-check-circle me-2"></i>Create & Sign
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div class="modal fade" id="qrCodeModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-qr-code me-2"></i>Guest Key QR Code
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div id="qr-container" class="mb-3 d-flex justify-content-center"></div>
+                    <div id="qr-key-details" class="text-start bg-dark p-3 rounded"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
