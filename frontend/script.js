@@ -36,9 +36,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Algorand Setup
-    const peraWallet = new PeraWalletConnect.PeraWalletConnect();
-    const algoClient = new algosdk.Algodv2('', 'https://testnet-api.algonode.cloud', '');
-    const indexerClient = new algosdk.Indexer('', 'https://testnet-idx.algonode.cloud', '');
+    const peraWallet = new PeraWalletConnect();
+    // Setup to facilitate sandbox
+    const algod_token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const algod_address = "http://localhost:4001";
+    const algoClient = new algosdk.Algodv2(algod_token, algod_address, '');
+
+const indexer_token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const indexer_address = "http://localhost:8980";
+const indexerClient = new algosdk.Indexer(indexer_token, indexer_address, '');
     
     // Application identifier - must match backend verification
     const APP_ID = "Soteria_v1.0";
