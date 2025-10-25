@@ -4,28 +4,57 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Soteria - Security Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="./style.css">
-    
-    <script src="https://unpkg.com/algosdk@2.7.0/dist/browser/algosdk.min.js"></script>
-    <script src="https://unpkg.com/@perawallet/connect@1.3.4/dist/index.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="./style.css">
+
+<!-- Simple Buffer polyfill for browser -->
+<script>
+  window.Buffer = {
+    from: function(data, encoding) {
+      if (typeof data === 'string') {
+        const encoder = new TextEncoder();
+        return encoder.encode(data);
+      }
+      if (data instanceof Uint8Array) {
+        return data;
+      }
+      if (Array.isArray(data)) {
+        return new Uint8Array(data);
+      }
+      return new Uint8Array();
+    },
+    alloc: function(size) {
+      return new Uint8Array(size);
+    }
+  };
+</script>
+
+<script src="https://unpkg.com/algosdk@2.7.0/dist/browser/algosdk.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="./pera-wallet-connect.js"></script>
 </head>
+
 <body>
     <div class="container-fluid p-3 p-md-4">
         <header class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-            <div class="d-flex align-items-center gap-3">
-                <i class="bi bi-shield-lock-fill text-info" style="font-size: 2.5rem;"></i>
-                <div>
-                    <h1 class="fw-bold mb-0" style="font-size: 2rem;">Soteria</h1>
-                    <p class="text-secondary mb-0 small">Blockchain Security System</p>
-                </div>
-            </div>
-            <button id="connect-wallet-btn" class="btn btn-info fw-semibold px-4">
-                <i class="bi bi-wallet2 me-2"></i>Connect Wallet
-            </button>
-        </header>
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-shield-lock-fill text-info" style="font-size: 2.5rem;"></i>
+        <div>
+            <h1 class="fw-bold mb-0" style="font-size: 2rem;">Soteria</h1>
+            <p class="text-secondary mb-0 small">Blockchain Security System</p>
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="guest.html" class="btn btn-outline-info" target="_blank">
+            <i class="bi bi-qr-code-scan me-2"></i>Guest Access
+        </a>
+        <button id="connect-wallet-btn" class="btn btn-info fw-semibold px-4">
+            <i class="bi bi-wallet2 me-2"></i>Connect Wallet
+        </button>
+    </div>
+</header>
 
         <main class="row g-4">
             <div class="col-lg-4">
@@ -174,6 +203,7 @@
         </div>
     </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

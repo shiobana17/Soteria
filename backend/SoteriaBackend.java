@@ -11,7 +11,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 /**
@@ -43,16 +45,24 @@ public class SoteriaBackend {
     private final LockController lockController;
     
     public SoteriaBackend(SoteriaConfig config) {
-        this.config = config;
-        this.indexerClient = new IndexerClient(config.getIndexerAddress(), config.getIndexerToken());
-        this.algodClient = new AlgodClient(config.getAlgodAddress(), config.getAlgodToken());
-        this.gson = new Gson();
-        this.lockController = new LockController(config.getLockGpioPin());
-        
-        LOGGER.info("Soteria Backend v" + config.getAppVersion() + " initialized");
-        LOGGER.info("App ID: " + config.getAppId());
-        LOGGER.info("Network: " + (config.isTestNet() ? "TestNet" : "MainNet"));
-    }
+    this.config = config;
+    
+    // For sandbox development
+    String indexerAddress = "http://localhost:8980";
+    String indexerToken = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    
+    String algodAddress = "http://localhost:4001";
+    String algodToken = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    
+    this.indexerClient = new IndexerClient(indexerAddress, indexerToken);
+    this.algodClient = new AlgodClient(algodAddress, algodToken);
+    this.gson = new Gson();
+    this.lockController = new LockController(config.getLockGpioPin());
+    
+    LOGGER.info("Soteria Backend v" + config.getAppVersion() + " initialized");
+    LOGGER.info("App ID: " + config.getAppId());
+    LOGGER.info("Network: Sandbox (localhost)");
+}
     
     /**
      * Main entry point for access verification
