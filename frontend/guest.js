@@ -141,10 +141,17 @@ document.addEventListener('DOMContentLoaded', () => {
 // Verify transaction exists on blockchain
 async function verifyTransactionExists(txId) {
     try {
-        const response = await indexerClient.lookupTransaction(txId).do();
+        console.log('Looking up transaction:', txId);
         
-        if (response && response.transaction) {
-            const tx = response.transaction;
+        // Use searchForTransactions instead of lookupTransaction
+        const response = await indexerClient.searchForTransactions()
+            .txid(txId)
+            .do();
+        
+        console.log('Indexer response:', response);
+        
+        if (response && response.transactions && response.transactions.length > 0) {
+            const tx = response.transactions[0];
             console.log('Transaction found:', tx);
             
             // Verify it's a Soteria transaction
@@ -218,33 +225,27 @@ async function checkRevocation(keyId, ownerAddress) {
         return false; // Fail open
     }
 }
-    // Simulate door unlock
-    function simulateDoorUnlock() {
-        const unlockDiv = document.createElement('div');
-        unlockDiv.className = 'alert alert-success text-center';
-        unlockDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; min-width: 300px; box-shadow: 0 10px 40px rgba(0,0,0,0.3);';
-        unlockDiv.innerHTML = `
-            <div style="font-size: 4rem; margin-bottom: 1rem;">🔓</div>
-            <h3>Door Unlocking...</h3>
-            <p class="mb-0">Access granted for 10 seconds</p>
-        `;
-        document.body.appendChild(unlockDiv);
+// Simulate door unlock (NO AUTO-LOCK)
+function simulateDoorUnlock() {
+    const unlockDiv = document.createElement('div');
+    unlockDiv.className = 'alert alert-success text-center';
+    unlockDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; min-width: 300px; box-shadow: 0 10px 40px rgba(0,0,0,0.3);';
+    unlockDiv.innerHTML = `
+        <div style="font-size: 4rem; margin-bottom: 1rem;">🔓</div>
+        <h3>Access Granted!</h3>
+        <p class="mb-0">Door unlocked - Free access</p>
+    `;
+    document.body.appendChild(unlockDiv);
 
-        setTimeout(() => {
-            unlockDiv.innerHTML = `
-                <div style="font-size: 4rem; margin-bottom: 1rem;">🔒</div>
-                <h3>Door Locked</h3>
-                <p class="mb-0">Have a nice day!</p>
-            `;
-            setTimeout(() => {
-                document.body.removeChild(unlockDiv);
-                // Restart scanner
-                if (html5QrCode && !html5QrCode.isScanning) {
-                    initQRScanner();
-                }
-            }, 3000);
-        }, 10000);
-    }
+    // Remove notification after 5 seconds (door stays unlocked)
+    setTimeout(() => {
+        document.body.removeChild(unlockDiv);
+        // Restart scanner
+        if (html5QrCode && !html5QrCode.isScanning) {
+            initQRScanner();
+        }
+    }, 5000);
+}
 
     // Add to scan history
     function addToHistory(keyName, status, detail) {

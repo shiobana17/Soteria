@@ -1,27 +1,3 @@
-// Soteria Security Dashboard - Frontend Application Logic
-// 
-// PROJECT ARCHITECTURE:
-// This frontend serves as "Mission Control" - a stateless web interface that:
-// 1. Connects to the user's Algorand wallet (their identity & authority)
-// 2. Creates cryptographically signed transactions for all actions
-// 3. Reads the immutable activity log from the Algorand blockchain
-// 4. Generates QR codes that the IoT backend can verify trustlessly
-//
-// TRUST MODEL:
-// - The frontend trusts: The user's wallet signature, Algorand blockchain
-// - The frontend does NOT trust: Any central server, cached data, itself
-// - All state is derived from on-chain transactions
-//
-// BACKEND VERIFICATION:
-// When the IoT device scans a QR code, it performs these checks:
-// 1. Parse & Sanitize: Validate QR code structure
-// 2. Authenticity: Verify transaction exists on-chain with matching data
-// 3. Revocation: Search blockchain for any revoke_guest_key transaction
-// 4. Time-Lock: Check if current time falls within validity window
-//
-// Only if ALL checks pass does the backend grant access.
-
-
 document.addEventListener('DOMContentLoaded', () => {
     // Check if libraries are loaded
     if (typeof PeraWalletConnect === 'undefined') {
@@ -89,6 +65,7 @@ devAccount.sk = new Uint8Array(devAccount.sk);
 userAccount = devAccount.addr;
 console.log('Auto-connected with dev account:', userAccount);
 
+    console.log("ITR") // Signature
 // Update UI immediately
 setTimeout(() => {
     updateUIForConnectedState();
@@ -97,7 +74,7 @@ setTimeout(() => {
     console.log('Soteria initializing...');
     console.log('PeraWallet:', peraWallet);
     console.log('AlgoSDK:', algosdk);
-    console.log("ITR") // Signature
+
 
 
     // DOM Elements
@@ -195,25 +172,33 @@ function updateUIForConnectedState() {
         }
     }
 
-    // Create Guest Key
+    // Create Guest Key - FIXED TIMEZONE ISSUE
     async function handleCreateKey(e) {
         e.preventDefault();
 
-        const details = {
-            name: document.getElementById('key-name').value.trim(),
-            recipient: document.getElementById('recipient-wallet').value.trim(),
-            validFrom: document.getElementById('start-date').value,
-            validUntil: document.getElementById('end-date').value
-        };
+        const keyName = document.getElementById('key-name').value.trim();
+        const recipient = document.getElementById('recipient-wallet').value.trim();
+        const startDateInput = document.getElementById('start-date').value;
+        const endDateInput = document.getElementById('end-date').value;
 
         // Validation
-        if (!algosdk.isValidAddress(details.recipient)) {
+        if (!algosdk.isValidAddress(recipient)) {
             showAlert('Invalid Algorand address', 'danger');
             return;
         }
 
-        const startTime = new Date(details.validFrom).getTime();
-        const endTime = new Date(details.validUntil).getTime();
+        // CRITICAL FIX: Convert to ISO 8601 format with proper timezone handling
+        const validFrom = new Date(startDateInput).toISOString();
+        const validUntil = new Date(endDateInput).toISOString();
+        
+        const startTime = new Date(validFrom).getTime();
+        const endTime = new Date(validUntil).getTime();
+
+        console.log('🕐 Time conversion:');
+        console.log('  Input start:', startDateInput);
+        console.log('  ISO start:', validFrom);
+        console.log('  Input end:', endDateInput);
+        console.log('  ISO end:', validUntil);
 
         if (endTime <= startTime) {
             showAlert('End time must be after start time', 'danger');
@@ -224,6 +209,13 @@ function updateUIForConnectedState() {
             showAlert('Start time cannot be in the past', 'danger');
             return;
         }
+
+        const details = {
+            name: keyName,
+            recipient: recipient,
+            validFrom: validFrom,  // ISO 8601 format
+            validUntil: validUntil  // ISO 8601 format
+        };
 
         try {
             await signAndSendTransaction({ action: 'create_guest_key', details }, 'create guest key');
@@ -238,16 +230,18 @@ function updateUIForConnectedState() {
 
     // Revoke Guest Key
     async function handleRevokeKey(keyId) {
-        if (!confirm('Are you sure you want to revoke this guest key? This action cannot be undone.')) {
+        if (!confirm('Are you sure you want to revoke this guest key?\n\n⚠️ This action cannot be undone and will immediately block all access for this key.')) {
             return;
         }
 
         try {
+            showAlert('Revoking key...', 'info', true);
             await signAndSendTransaction({ action: 'revoke_guest_key', revokes: keyId }, 'revoke guest key');
             await fetchActivityLogs();
-            showAlert('Guest key revoked successfully', 'warning');
+            showAlert('✅ Guest key revoked successfully', 'warning');
         } catch (err) {
             console.error('Revoke failed:', err);
+            showAlert('Failed to revoke key', 'danger');
         }
     }
 
@@ -311,8 +305,6 @@ async function signAndSendTransaction(data, purpose) {
     }
 }
     // Fetch Activity Logs
-    // Fetch Activity Logs
-// Fetch Activity Logs
 async function fetchActivityLogs() {
     if (!userAccount) {
         console.error('Cannot fetch logs: userAccount not set');
@@ -463,6 +455,18 @@ function createLogElement(tx) {
             title = 'Guest Key Revoked';
             subtitle = `Key ID ${tx.noteData.revokes.substring(0, 8)}...`;
             break;
+        case 'guest_access':
+            color = 'success';
+            icon = 'door-open-fill';
+            title = '🚪 Guest Accessed Door';
+            subtitle = `${tx.noteData.keyName} entered`;
+            break;
+        case 'guest_access_denied':
+            color = 'danger';
+            icon = 'shield-x-fill';
+            title = '⛔ Access Denied';
+            subtitle = `${tx.noteData.keyName} - ${tx.noteData.reason}`;
+            break;
         default:
             console.warn('Unknown action type:', action);
             return '';
@@ -500,67 +504,78 @@ function createLogElement(tx) {
     
     return html;
 }
-    // Create Guest Key Element HTML
+
+    // Create Guest Key Element HTML - WITH REVOKE BUTTON
     function createGuestKeyElement(tx, isRevoked) {
         const { details } = tx.noteData;
-        const statusBadge = isRevoked 
-            ? '<span class="badge bg-danger">Revoked</span>' 
-            : '<span class="badge bg-success">Active</span>';
+        
+        // Check if key is expired
+        const now = Date.now();
+        const validUntil = new Date(details.validUntil).getTime();
+        const isExpired = now > validUntil;
+        
+        // Status badge
+        let statusBadge = '';
+        if (isRevoked) {
+            statusBadge = '<span class="badge bg-danger ms-2">Revoked</span>';
+        } else if (isExpired) {
+            statusBadge = '<span class="badge bg-secondary ms-2">Expired</span>';
+        } else {
+            statusBadge = '<span class="badge bg-success ms-2">Active</span>';
+        }
         
         const shortRecipient = `${details.recipient.substring(0, 8)}...${details.recipient.slice(-6)}`;
         
-        const startDate = new Date(details.validFrom).toLocaleDateString();
-        const endDate = new Date(details.validUntil).toLocaleDateString();
+        const startDate = new Date(details.validFrom).toLocaleString();
+        const endDate = new Date(details.validUntil).toLocaleString();
 
         return `
             <div class="guest-key-item">
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="flex-grow-1">
                         <p class="mb-1 fw-semibold">
-                            <i class="bi bi-key me-1"></i>${details.name} ${statusBadge}
+                            <i class="bi bi-key me-1"></i>${details.name}${statusBadge}
                         </p>
                         <p class="mb-0 small text-secondary">
                             <i class="bi bi-person me-1"></i>${shortRecipient}
                         </p>
                         <p class="mb-0 small text-secondary">
-                            <i class="bi bi-calendar-range me-1"></i>${startDate} - ${endDate}
+                            <i class="bi bi-calendar-range me-1"></i>${startDate} → ${endDate}
                         </p>
                     </div>
                     <div class="btn-group">
                         <button class="btn btn-sm btn-outline-info" 
                                 onclick="window.showQRCode('${tx.id}')" 
-                                ${isRevoked ? 'disabled' : ''}
+                                ${isRevoked || isExpired ? 'disabled' : ''}
                                 title="View QR Code">
                             <i class="bi bi-qr-code"></i>
                         </button>
                         <button class="btn btn-sm btn-outline-danger" 
                                 onclick="window.revokeGuestKey('${tx.id}')" 
-                                ${isRevoked ? 'disabled' : ''}
-                                title="Revoke Key">
-                            <i class="bi bi-trash-fill"></i>
+                                ${isRevoked || isExpired ? 'disabled' : ''}
+                                title="Revoke Access">
+                            <i class="bi bi-x-circle"></i>
                         </button>
                     </div>
                 </div>
             </div>`;
     }
 
-// Display QR Code
+// Display QR Code - FIXED TO MATCH BACKEND EXPECTATIONS
 function displayQRCode(txId) {
     const tx = allTransactions.find(t => t.id === txId);
     if (!tx) return;
 
     const { details } = tx.noteData;
     
-    // QR Code data structure - CRITICAL: Must match backend verification expectations
+    // QR Code data structure - MUST MATCH what backend expects
     const qrData = JSON.stringify({
-        version: APP_VERSION,
-        keyId: txId,              
-        recipient: details.recipient,
-        validFrom: details.validFrom,
-        validUntil: details.validUntil,
-        keyName: details.name,
-        appId: APP_ID,
-        createdAt: tx.noteData.timestamp
+        appId: APP_ID,              // backend checks this
+        keyId: txId,                // backend uses this to lookup transaction
+        keyName: details.name,       // for display purposes
+        validFrom: details.validFrom, // ISO 8601 timestamp
+        validUntil: details.validUntil // ISO 8601 timestamp
+        // NOTE: recipient is NOT in QR - backend fetches it from blockchain
     });
 
     console.log('='.repeat(60));

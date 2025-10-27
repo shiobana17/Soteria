@@ -1,8 +1,11 @@
 package com.soteria.backend;
 
-import com.algorand.algosdk.v2.client.common.AlgodClient;
 import com.algorand.algosdk.v2.client.common.IndexerClient;
-import com.algorand.algosdk.v2.client.model.Transaction;
+import com.algorand.algosdk.v2.client.common.AlgodClient;
+import com.algorand.algosdk.v2.client.common.Response;
+import com.algorand.algosdk.v2.client.model.TransactionResponse;
+import com.algorand.algosdk.v2.client.model.TransactionsResponse;
+import com.algorand.algosdk.crypto.Address;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -10,139 +13,130 @@ import com.google.gson.JsonParser;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
-import java.util.Base64;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-/**
- * Soteria Backend - IoT Device Access Control System
- * 
- * ROLE: The Digital Bouncer
- * This backend is a stateless, trustless verifier that grants or denies access
- * based solely on the mathematical certainty of the Algorand blockchain.
- * 
- * TRUST MODEL:
- * - Trusts: Algorand blockchain consensus, cryptographic signatures
- * - Does NOT trust: QR codes, user claims, cached data, the frontend
- * 
- * VERIFICATION ALGORITHM:
- * 1. Parse & Sanitize: Validate QR code structure
- * 2. Authenticity Check: Verify transaction exists on-chain
- * 3. Revocation Check: Search for revoke transactions
- * 4. Time-Lock Check: Verify current time is within validity window
- * 
- * Only if ALL checks pass → Grant Access
- */
 public class SoteriaBackend {
     
     private static final Logger LOGGER = Logger.getLogger(SoteriaBackend.class.getName());
     private final SoteriaConfig config;
     private final IndexerClient indexerClient;
-    private final AlgodClient algodClient;
-    private final Gson gson;
+    @SuppressWarnings("unused")
+    private final AlgodClient algodClient;  // Reserved for future transaction submission
+    @SuppressWarnings("unused")
+    private final Gson gson;  // Reserved for future JSON operations
     private final LockController lockController;
+    private final AccessLogger accessLogger;  
     
-    public SoteriaBackend(SoteriaConfig config) {
+
+    public SoteriaBackend(SoteriaConfig config, String smartLockMnemonic) {
     this.config = config;
     
     // For sandbox development
-    String indexerAddress = "http://localhost:8980";
-    String indexerToken = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    String host = "localhost";
+    int indexerPort = 8980;
+    int algodPort = 4001;
+    String token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     
-    String algodAddress = "http://localhost:4001";
-    String algodToken = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    
-    this.indexerClient = new IndexerClient(indexerAddress, indexerToken);
-    this.algodClient = new AlgodClient(algodAddress, algodToken);
+    this.indexerClient = new IndexerClient(host, indexerPort, token);
+    this.algodClient = new AlgodClient(host, algodPort, token);
     this.gson = new Gson();
     this.lockController = new LockController(config.getLockGpioPin());
+    this.accessLogger = new AccessLogger(config, algodClient, smartLockMnemonic);
     
     LOGGER.info("Soteria Backend v" + config.getAppVersion() + " initialized");
     LOGGER.info("App ID: " + config.getAppId());
+    LOGGER.info("Smart Lock Address: " + accessLogger.getSmartLockAddress());
     LOGGER.info("Network: Sandbox (localhost)");
 }
+
+public VerificationResult verifyAccess(String qrCodeData) {
+    LOGGER.info("========================================");
+    LOGGER.info("ACCESS VERIFICATION REQUEST");
+    LOGGER.info("========================================");
     
-    /**
-     * Main entry point for access verification
-     * 
-     * @param qrCodeData Raw JSON string from scanned QR code
-     * @return VerificationResult indicating whether access should be granted
-     */
-    public VerificationResult verifyAccess(String qrCodeData) {
-        LOGGER.info("========================================");
-        LOGGER.info("ACCESS VERIFICATION REQUEST");
-        LOGGER.info("========================================");
-        
-        long startTime = System.currentTimeMillis();
-        
-        try {
-            // Step 1: Parse & Sanitize
-            LOGGER.info("Step 1: Parse & Sanitize QR Code");
-            QRCodeData qrData = parseAndSanitize(qrCodeData);
-            if (qrData == null) {
-                return VerificationResult.deny("Invalid QR code format");
-            }
-            LOGGER.info("✓ QR code parsed successfully");
-            LOGGER.info("  Key ID: " + qrData.keyId);
-            LOGGER.info("  Recipient: " + qrData.recipient);
-            LOGGER.info("  Key Name: " + qrData.keyName);
-            
-            // Step 2: Authenticity Check
-            LOGGER.info("\nStep 2: Authenticity Check (On-Chain Lookup)");
-            TransactionData txData = verifyAuthenticity(qrData);
-            if (txData == null) {
-                return VerificationResult.deny("Transaction not found on blockchain");
-            }
-            LOGGER.info("✓ Transaction found on-chain");
-            LOGGER.info("  Confirmed in round: " + txData.confirmedRound);
-            LOGGER.info("  Owner: " + txData.owner);
-            
-            // Step 3: Revocation Check
-            LOGGER.info("\nStep 3: Revocation Check (Search Owner's History)");
-            if (isKeyRevoked(qrData.keyId, txData.owner)) {
-                return VerificationResult.deny("Key has been revoked by owner");
-            }
-            LOGGER.info("✓ No revocation found - key is active");
-            
-            // Step 4: Time-Lock Check
-            LOGGER.info("\nStep 4: Time-Lock Check (Validity Window)");
-            VerificationResult timeLockResult = verifyTimeLock(qrData);
-            if (!timeLockResult.isGranted()) {
-                return timeLockResult;
-            }
-            LOGGER.info("✓ Current time is within validity window");
-            
-            // All checks passed
-            long duration = System.currentTimeMillis() - startTime;
-            LOGGER.info("\n========================================");
-            LOGGER.info("✓✓✓ ACCESS GRANTED ✓✓✓");
-            LOGGER.info("All verification checks passed");
-            LOGGER.info("Verification time: " + duration + "ms");
-            LOGGER.info("========================================");
-            
-            // Grant physical access
-            grantAccess(qrData);
-            
-            // Create details maps for VerificationResult
-            Map<String, Object> qrDataMap = new HashMap<>();
-            qrDataMap.put("keyId", qrData.keyId);
-            qrDataMap.put("recipient", qrData.recipient);
-            qrDataMap.put("keyName", qrData.keyName);
-            
-            Map<String, Object> txDataMap = new HashMap<>();
-            txDataMap.put("owner", txData.owner);
-            txDataMap.put("confirmedRound", txData.confirmedRound);
-            
-            return VerificationResult.grant("All verification checks passed", qrDataMap, txDataMap);
-            
-        } catch (Exception e) {
-            LOGGER.severe("Verification error: " + e.getMessage());
-            e.printStackTrace();
-            return VerificationResult.deny("System error during verification: " + e.getMessage());
+    long startTime = System.currentTimeMillis();
+    
+    try {
+        // Step 1: Parse & Sanitize
+        LOGGER.info("Step 1: Parse & Sanitize QR Code");
+        QRCodeData qrData = parseAndSanitize(qrCodeData);
+        if (qrData == null) {
+            return VerificationResult.deny("Invalid QR code format");
         }
+        LOGGER.info("✓ QR code parsed successfully");
+        LOGGER.info("  Key ID: " + qrData.keyId);
+        LOGGER.info("  Key Name: " + qrData.keyName);
+        
+        // Step 2: Authenticity Check
+        LOGGER.info("\nStep 2: Authenticity Check (On-Chain Lookup)");
+        TransactionData txData = verifyAuthenticity(qrData);
+        if (txData == null) {
+            accessLogger.logAccessDenied(qrData.keyId, qrData.keyName, "UNKNOWN", "Transaction not found");
+            return VerificationResult.deny("Transaction not found on blockchain");
+        }
+        LOGGER.info("✓ Transaction found on-chain");
+        LOGGER.info("  Confirmed in round: " + txData.confirmedRound);
+        LOGGER.info("  Owner: " + txData.owner);
+        LOGGER.info("  Recipient: " + txData.recipient);
+        
+        // Step 3: Revocation Check
+        LOGGER.info("\nStep 3: Revocation Check (Search Owner's History)");
+        if (isKeyRevoked(qrData.keyId, txData.owner)) {
+            accessLogger.logAccessDenied(qrData.keyId, qrData.keyName, txData.owner, "Key revoked by owner");
+            return VerificationResult.deny("Key has been revoked by owner");
+        }
+        LOGGER.info("✓ No revocation found - key is active");
+        
+        // Step 4: Time-Lock Check
+        LOGGER.info("\nStep 4: Time-Lock Check (Validity Window)");
+        VerificationResult timeLockResult = verifyTimeLock(qrData);
+        if (!timeLockResult.isGranted()) {
+            accessLogger.logAccessDenied(qrData.keyId, qrData.keyName, txData.owner, timeLockResult.getReason());
+            return timeLockResult;
+        }
+        LOGGER.info("✓ Current time is within validity window");
+        
+        // All checks passed
+        long duration = System.currentTimeMillis() - startTime;
+        LOGGER.info("\n========================================");
+        LOGGER.info("✓✓✓ ACCESS GRANTED ✓✓✓");
+        LOGGER.info("All verification checks passed");
+        LOGGER.info("Verification time: " + duration + "ms");
+        LOGGER.info("========================================");
+        
+        // Grant physical access
+        grantAccess(qrData);
+        
+        // Log successful access to blockchain
+        LOGGER.info("\nLogging access event to blockchain...");
+        String accessLogTxId = accessLogger.logAccessGranted(qrData.keyId, qrData.keyName, txData.owner);
+        if (accessLogTxId != null) {
+            LOGGER.info("✓ Access logged to blockchain: " + accessLogTxId);
+        } else {
+            LOGGER.warning("⚠ Failed to log access (but door unlocked anyway)");
+        }
+        
+        // Create details maps for VerificationResult
+        Map<String, Object> qrDataMap = new HashMap<>();
+        qrDataMap.put("keyId", qrData.keyId);
+        qrDataMap.put("keyName", qrData.keyName);
+        qrDataMap.put("recipient", txData.recipient);
+        qrDataMap.put("accessLogTxId", accessLogTxId);
+        
+        Map<String, Object> txDataMap = new HashMap<>();
+        txDataMap.put("owner", txData.owner);
+        txDataMap.put("confirmedRound", txData.confirmedRound);
+        
+        return VerificationResult.grant("All verification checks passed", qrDataMap, txDataMap);
+        
+    } catch (Exception e) {
+        LOGGER.severe("Verification error: " + e.getMessage());
+        e.printStackTrace();
+        return VerificationResult.deny("System error during verification: " + e.getMessage());
     }
+}
     
     /**
      * Step 1: Parse & Sanitize
@@ -152,10 +146,11 @@ public class SoteriaBackend {
         try {
             JsonObject json = JsonParser.parseString(qrCodeData).getAsJsonObject();
             
+            LOGGER.info("  Raw QR JSON: " + qrCodeData);
+            
             // Validate required fields
-            if (!json.has("keyId") || !json.has("recipient") || 
-                !json.has("validFrom") || !json.has("validUntil") || 
-                !json.has("appId")) {
+            if (!json.has("keyId") || !json.has("validFrom") || 
+                !json.has("validUntil") || !json.has("appId")) {
                 LOGGER.warning("✗ Missing required fields in QR code");
                 return null;
             }
@@ -167,18 +162,17 @@ public class SoteriaBackend {
                 return null;
             }
             
-            // Extract and validate data
+            // Extract data
             QRCodeData data = new QRCodeData();
             data.keyId = json.get("keyId").getAsString();
-            data.recipient = json.get("recipient").getAsString();
             data.validFrom = json.get("validFrom").getAsString();
             data.validUntil = json.get("validUntil").getAsString();
-            data.keyName = json.has("keyName") ? json.get("keyName").getAsString() : "Unknown";
+            data.keyName = json.has("keyName") ? json.get("keyName").getAsString() : "Unknown Guest";
             data.appId = appId;
             
-            // Validate Algorand address format (58 characters, base32)
-            if (!isValidAlgorandAddress(data.recipient)) {
-                LOGGER.warning("✗ Invalid Algorand address format");
+            // Validate keyId looks like a transaction ID (52 chars, uppercase alphanumeric)
+            if (data.keyId.length() != 52 || !data.keyId.matches("[A-Z0-9]+")) {
+                LOGGER.warning("✗ Invalid transaction ID format: " + data.keyId);
                 return null;
             }
             
@@ -186,25 +180,28 @@ public class SoteriaBackend {
             
         } catch (Exception e) {
             LOGGER.warning("✗ Failed to parse QR code: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }
     
     /**
      * Step 2: Authenticity Check
-     * Verifies the transaction exists on-chain and matches QR data
+     * Verifies the transaction exists on-chain and extracts recipient from blockchain
      */
     private TransactionData verifyAuthenticity(QRCodeData qrData) {
         try {
-            // Look up transaction by ID on the blockchain
-            var response = indexerClient.lookupTransaction(qrData.keyId).execute();
+            // Look up transaction by ID - v2 API
+            Response<TransactionResponse> response = indexerClient
+                .lookupTransaction(qrData.keyId)
+                .execute();
             
-            if (!response.isSuccessful() || response.body() == null) {
+            if (response.body() == null || response.body().transaction == null) {
                 LOGGER.warning("✗ Transaction not found: " + qrData.keyId);
                 return null;
             }
             
-            Transaction tx = response.body().transaction;
+            com.algorand.algosdk.v2.client.model.Transaction tx = response.body().transaction;
             
             // Decode and parse the note field
             if (tx.note == null || tx.note.length == 0) {
@@ -213,6 +210,8 @@ public class SoteriaBackend {
             }
             
             String noteJson = new String(tx.note, StandardCharsets.UTF_8);
+            LOGGER.info("  Transaction note: " + noteJson);
+            
             JsonObject noteData = JsonParser.parseString(noteJson).getAsJsonObject();
             
             // Verify app_id matches
@@ -227,17 +226,25 @@ public class SoteriaBackend {
                 return null;
             }
             
-            // Verify details match QR code
+            // Extract details
             if (!noteData.has("details")) {
                 LOGGER.warning("✗ Transaction missing details");
                 return null;
             }
             
             JsonObject details = noteData.getAsJsonObject("details");
-            String txRecipient = details.get("recipient").getAsString();
             
-            if (!qrData.recipient.equals(txRecipient)) {
-                LOGGER.warning("✗ Recipient mismatch. QR: " + qrData.recipient + ", Chain: " + txRecipient);
+            // Extract recipient from blockchain
+            if (!details.has("recipient")) {
+                LOGGER.warning("✗ Transaction missing recipient in details");
+                return null;
+            }
+            
+            String recipient = details.get("recipient").getAsString();
+            
+            // Validate recipient address format
+            if (!isValidAlgorandAddress(recipient)) {
+                LOGGER.warning("✗ Invalid recipient address format: " + recipient);
                 return null;
             }
             
@@ -245,6 +252,7 @@ public class SoteriaBackend {
             TransactionData txData = new TransactionData();
             txData.txId = qrData.keyId;
             txData.owner = tx.sender;
+            txData.recipient = recipient;
             txData.confirmedRound = tx.confirmedRound;
             txData.noteData = noteData;
             
@@ -252,6 +260,7 @@ public class SoteriaBackend {
             
         } catch (Exception e) {
             LOGGER.severe("✗ Error during authenticity check: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }
@@ -262,19 +271,22 @@ public class SoteriaBackend {
      */
     private boolean isKeyRevoked(String keyId, String ownerAddress) {
         try {
-            // Search owner's transactions for revocations
-            var response = indexerClient.lookupAccountTransactions(ownerAddress)
-                .limit(1000L)  // Search last 1000 transactions
+            // Convert string to Address object
+            Address ownerAddr = new Address(ownerAddress);
+            
+            // Search owner's transactions - v2 API
+            Response<TransactionsResponse> response = indexerClient
+                .searchForTransactions()
+                .address(ownerAddr)
+                .limit(1000L)
                 .execute();
             
-            if (!response.isSuccessful() || response.body() == null) {
+            if (response.body() == null || response.body().transactions == null) {
                 LOGGER.warning("⚠ Could not fetch owner's transaction history");
                 return false; // Fail open if we can't check
             }
             
-            List<Transaction> transactions = response.body().transactions;
-            
-            for (Transaction tx : transactions) {
+            for (com.algorand.algosdk.v2.client.model.Transaction tx : response.body().transactions) {
                 if (tx.note == null || tx.note.length == 0) continue;
                 
                 try {
@@ -299,6 +311,7 @@ public class SoteriaBackend {
             
         } catch (Exception e) {
             LOGGER.severe("✗ Error during revocation check: " + e.getMessage());
+            e.printStackTrace();
             return false; // Fail open if we can't check
         }
     }
@@ -390,20 +403,23 @@ public class SoteriaBackend {
      */
     private static class QRCodeData {
         String keyId;
-        String recipient;
         String validFrom;
         String validUntil;
         String keyName;
-        String appId;
+        @SuppressWarnings("unused")
+        String appId;  // Reserved for additional validation
     }
     
     /**
      * Inner class to hold transaction data from blockchain
      */
     private static class TransactionData {
-        String txId;
+        @SuppressWarnings("unused")
+        String txId;  // Reserved for logging
         String owner;
+        String recipient;
         Long confirmedRound;
-        JsonObject noteData;
+        @SuppressWarnings("unused")
+        JsonObject noteData;  // Reserved for advanced validation
     }
 }

@@ -288,10 +288,17 @@ body {
 
 /* Header Title Gradient */
 header h1 {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-green) 100%);
+    background: linear-gradient(135deg, #58a6ff 0%, #3fb950 100%);
     -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
     background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 10px rgba(88, 166, 255, 0.4);
+    /* Anti-blur fixes */
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Utility Classes */
