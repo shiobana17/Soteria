@@ -24,7 +24,7 @@ const indexer_address = "https://testnet-idx.algonode.cloud";
 const indexerClient = new algosdk.Indexer(indexer_token, indexer_address, '');
     
     // Application identifier - must match backend verification
-    const APP_ID = "Soteria_v1.0";
+    const APP_ID = "Soteria_v1.0"; //Needs to be changed when deploy.py is run
     const APP_VERSION = "1.0.0";
 // AUTO-GENERATE DEV ACCOUNT (NO MNEMONIC NEEDED)
 let devAccount = null;
@@ -104,8 +104,6 @@ if (!connectWalletBtn) console.error('❌ connectWalletBtn not found!');
 
     // Event Listeners
     connectWalletBtn.addEventListener('click', handleConnectWallet);
-    unlockBtn.addEventListener('click', () => handleLockAction('unlock'));
-    lockBtn.addEventListener('click', () => handleLockAction('lock'));
     createKeyForm.addEventListener('submit', handleCreateKey);
 
 // Wallet Connection
@@ -153,224 +151,253 @@ function updateUIForConnectedState() {
     fetchActivityLogs();
 }
 
-    // Lock/Unlock Actions
-    async function handleLockAction(action) {
-        if (!userAccount) {
-            showAlert('Please connect your wallet first', 'warning');
-            return;
-        }
 
-        try {
-            await signAndSendTransaction({ action }, action);
-            isLocked = action === 'lock';
-            updateLockUI();
-            await fetchActivityLogs();
-        } catch (err) {
-            console.error('Action failed:', err);
-        } finally {
-            updateLockButtonStates();
-        }
+// ABI Definition for our contract methods
+// We define this manually to avoid needing to fetch the abi.json file
+const contractMethods = [
+    {
+        "name": "create_key",
+        "args": [
+            {"type":"string","name":"key_id"},
+            {"type":"address","name":"recipient"},
+            {"type":"uint64","name":"valid_from"},
+            {"type":"uint64","name":"valid_until"}
+        ],
+        "returns": {"type":"void"}
+    },
+    {
+        "name": "revoke_key",
+        "args": [{"type":"string","name":"key_id"}],
+        "returns": {"type":"void"}
     }
+];
 
-    // Create Guest Key - FIXED TIMEZONE ISSUE
-    async function handleCreateKey(e) {
-        e.preventDefault();
-
-        const keyName = document.getElementById('key-name').value.trim();
-        const recipient = document.getElementById('recipient-wallet').value.trim();
-        const startDateInput = document.getElementById('start-date').value;
-        const endDateInput = document.getElementById('end-date').value;
-
-        // Validation
-        if (!algosdk.isValidAddress(recipient)) {
-            showAlert('Invalid Algorand address', 'danger');
-            return;
-        }
-
-        // CRITICAL FIX: Convert to ISO 8601 format with proper timezone handling
-        const validFrom = new Date(startDateInput).toISOString();
-        const validUntil = new Date(endDateInput).toISOString();
-        
-        const startTime = new Date(validFrom).getTime();
-        const endTime = new Date(validUntil).getTime();
-
-        console.log('🕐 Time conversion:');
-        console.log('  Input start:', startDateInput);
-        console.log('  ISO start:', validFrom);
-        console.log('  Input end:', endDateInput);
-        console.log('  ISO end:', validUntil);
-
-        if (endTime <= startTime) {
-            showAlert('End time must be after start time', 'danger');
-            return;
-        }
-
-        if (startTime < Date.now()) {
-            showAlert('Start time cannot be in the past', 'danger');
-            return;
-        }
-
-        const details = {
-            name: keyName,
-            recipient: recipient,
-            validFrom: validFrom,  // ISO 8601 format
-            validUntil: validUntil  // ISO 8601 format
-        };
-
-        try {
-            await signAndSendTransaction({ action: 'create_guest_key', details }, 'create guest key');
-            createKeyForm.reset();
-            createKeyModal.hide();
-            await fetchActivityLogs();
-            showAlert('Guest key created successfully!', 'success');
-        } catch (err) {
-            console.error('Create key failed:', err);
-        }
-    }
-
-    // Revoke Guest Key
-    async function handleRevokeKey(keyId) {
-        if (!confirm('Are you sure you want to revoke this guest key?\n\n⚠️ This action cannot be undone and will immediately block all access for this key.')) {
-            return;
-        }
-
-        try {
-            showAlert('Revoking key...', 'info', true);
-            await signAndSendTransaction({ action: 'revoke_guest_key', revokes: keyId }, 'revoke guest key');
-            await fetchActivityLogs();
-            showAlert('✅ Guest key revoked successfully', 'warning');
-        } catch (err) {
-            console.error('Revoke failed:', err);
-            showAlert('Failed to revoke key', 'danger');
-        }
-    }
-
-    // Sign and Send Transaction
-async function signAndSendTransaction(data, purpose) {
+async function handleCreateKey(e) {
+    e.preventDefault();
     if (!userAccount) {
-        throw new Error('Wallet not connected');
+        showAlert('Please connect your wallet first', 'warning');
+        return;
+    }
+    if (APP_ID === 0) {
+        showAlert('APP_ID is not set in script.js!', 'danger');
+        return;
     }
 
-    showAlert(`Signing transaction to ${purpose}...`, 'info', true);
+    const keyName = document.getElementById('key-name').value.trim();
+    const recipient = document.getElementById('recipient-wallet').value.trim();
+    const startDateInput = document.getElementById('start-date').value;
+    const endDateInput = document.getElementById('end-date').value;
+
+    // --- Validation ---
+    if (!keyName || !recipient || !startDateInput || !endDateInput) {
+        showAlert('All fields are required', 'warning');
+        return;
+    }
+    if (!algosdk.isValidAddress(recipient)) {
+        showAlert('Invalid Algorand address', 'danger');
+        return;
+    }
+
+    // --- Data Preparation ---
+    // 1. Generate a unique key_id (Box name)
+    // We use a simple composite. A UUID library would be more robust.
+    const keyId = `${keyName.replace(/\s+/g, '_')}-${recipient.substring(0, 8)}-${Date.now()}`;
+    
+    // 2. Convert dates to UNIX timestamps (seconds), which the contract expects
+    const validFrom = Math.floor(new Date(startDateInput).getTime() / 1000);
+    const validUntil = Math.floor(new Date(endDateInput).getTime() / 1000);
+
+    if (validUntil <= validFrom) {
+        showAlert('End time must be after start time', 'danger');
+        return;
+    }
+    if (validFrom < Math.floor(Date.now() / 1000)) {
+        showAlert('Start time cannot be in the past', 'danger');
+        return;
+    }
+
+    showAlert('Creating key on-chain...', 'info', true);
     setAllButtonsDisabled(true);
 
     try {
         const params = await algoClient.getTransactionParams().do();
         
-        const noteData = {
-            app_id: APP_ID,
-            timestamp: new Date().toISOString(),
-            ...data
-        };
+        // We need to pay for box creation. This covers the 64 bytes.
+        // min bal for box = 2500 + (len(key_id) + 64) * 400
+        const boxMbr = 2500 + (keyId.length + 64) * 400;
+        params.fee = 2 * algosdk.ALGORAND_MIN_TX_FEE; // 1 for app call, 1 for box create
         
-        console.log('Creating transaction with note:', noteData);
-        const note = Buffer.from(JSON.stringify(noteData));
+        const atc = new algosdk.AtomicTransactionComposer();
 
-        const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+        // 1. Payment transaction to fund the Box MBR
+        const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
             from: userAccount,
-            to: userAccount,
-            amount: 0,
-            note,
-            suggestedParams: params
+            to: algosdk.getApplicationAddress(APP_ID),
+            amount: boxMbr,
+            suggestedParams: params,
         });
 
-        if (!devAccount) {
-            throw new Error('Dev account not configured');
-        }
-        const signedTxn = txn.signTxn(devAccount.sk);
+        // 2. Application call to create_key
+        atc.addMethodCall({
+            appID: APP_ID,
+            method: algosdk.getMethodByName(contractMethods, "create_key"),
+            sender: userAccount,
+            suggestedParams: params,
+            signer: algosdk.makeBasicAccountTransactionSigner(devAccount), // Assumes devAccount is the signer
+            methodArgs: [keyId, recipient, validFrom, validUntil],
+            // We MUST reference the box we are creating
+            boxes: [{ appIndex: 0, name: new Uint8Array(Buffer.from(keyId)) }],
+            // We group the payment txn with the app call
+            txnToSign: paymentTxn
+        });
 
-        showAlert('Sending transaction...', 'info', true);
-        const { txId } = await algoClient.sendRawTransaction(signedTxn).do();
-        console.log('Transaction sent:', txId);
+        console.log(`Submitting create_key call for keyId: ${keyId}`);
+        const result = await atc.execute(algoClient, 4);
+        console.log('Transaction confirmed:', result.txIDs[0]);
 
-        showAlert('Confirming transaction...', 'info', true);
-        await algosdk.waitForConfirmation(algoClient, txId, 4);
-        console.log('Transaction confirmed:', txId);
-
-        showAlert(`Successfully ${purpose}ed!`, 'success');
+        createKeyForm.reset();
+        createKeyModal.hide();
+        showAlert('Guest key created successfully!', 'success');
         
-        // Wait a bit for indexer to catch up, then refresh logs
-        setTimeout(() => {
-            console.log('Refreshing activity logs...');
-            fetchActivityLogs();
-        }, 2000);
-        
+        // Wait for indexer/node and refresh
+        setTimeout(fetchActivityLogs, 2000);
+
     } catch (err) {
-        console.error('Transaction error:', err);
-        showAlert('Transaction failed or rejected', 'danger');
-        throw err;
+        console.error('Create key failed:', err);
+        showAlert(err.message || 'Failed to create key', 'danger');
     } finally {
         setAllButtonsDisabled(false);
-        updateLockButtonStates();
     }
 }
+
+    // Revoke Guest Key
+async function handleRevokeKey(keyId) {
+    if (!confirm(`Are you sure you want to revoke this guest key?\n\nID: ${keyId}\n\n⚠️ This action cannot be undone.`)) {
+        return;
+    }
+    if (!userAccount) {
+        showAlert('Please connect your wallet first', 'warning');
+        return;
+    }
+
+    showAlert('Revoking key...', 'info', true);
+    setAllButtonsDisabled(true);
+
+    try {
+        const params = await algoClient.getTransactionParams().do();
+        // Fee for 1 app call
+        params.fee = algosdk.ALGORAND_MIN_TX_FEE; 
+        
+        const atc = new algosdk.AtomicTransactionComposer();
+
+        atc.addMethodCall({
+            appID: APP_ID,
+            method: algosdk.getMethodByName(contractMethods, "revoke_key"),
+            sender: userAccount,
+            suggestedParams: params,
+            signer: algosdk.makeBasicAccountTransactionSigner(devAccount),
+            methodArgs: [keyId],
+            // We MUST reference the box we are modifying
+            boxes: [{ appIndex: 0, name: new Uint8Array(Buffer.from(keyId)) }]
+        });
+
+        console.log(`Submitting revoke_key call for keyId: ${keyId}`);
+        const result = await atc.execute(algoClient, 4);
+        console.log('Transaction confirmed:', result.txIDs[0]);
+
+        showAlert('✅ Guest key revoked successfully', 'warning');
+        
+        // Wait for indexer/node and refresh
+        setTimeout(fetchActivityLogs, 2000);
+
+    } catch (err) {
+        console.error('Revoke failed:', err);
+        showAlert(err.message || 'Failed to revoke key', 'danger');
+    } finally {
+        setAllButtonsDisabled(false);
+    }
+}
+
+
     // Fetch Activity Logs
+// Helper function to parse 8-byte Uint64 from box data
+function parseUint64(bytes, offset) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return view.getBigUint64(offset, false); // false for big-endian
+}
+// Helper function to parse 32-byte address from box data
+function parseAddress(bytes, offset) {
+    const addressBytes = bytes.slice(offset, offset + 32);
+    return algosdk.encodeAddress(addressBytes);
+}
+
+// Stores parsed box data
+let allKeys = [];
+
 async function fetchActivityLogs() {
     if (!userAccount) {
         console.error('Cannot fetch logs: userAccount not set');
         return;
     }
+     if (APP_ID === 0) {
+        logContainer.innerHTML = `<div class="text-center mt-5"><p class="text-danger">APP_ID is not set in script.js!</p></div>`;
+        return;
+    }
 
-    console.log('Fetching logs for account:', userAccount);
+    console.log('Fetching contract boxes for App ID:', APP_ID);
 
     logContainer.innerHTML = `
         <div class="text-center mt-5">
             <div class="spinner-border text-info" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
-            <p class="text-secondary mt-3">Loading activity logs...</p>
+            <p class="text-secondary mt-3">Loading keys from contract boxes...</p>
         </div>`;
 
     try {
-        console.log('Calling indexer for:', userAccount);
-        const response = await indexerClient.lookupAccountTransactions(userAccount).do();
-        console.log('Indexer response:', response);
+        const response = await algoClient.getApplicationBoxes(APP_ID).do();
+        const boxNames = response.boxes.map(box => box.name);
+        console.log(`Found ${boxNames.length} key boxes`);
+
+        allKeys = []; // Clear previous state
         
-        const transactions = response.transactions || [];
-        console.log(`Found ${transactions.length} total transactions`);
+        for (const boxNameBytes of boxNames) {
+            const boxName = new TextDecoder().decode(boxNameBytes);
+            try {
+                const boxValue = await algoClient.getApplicationBoxByName(APP_ID, boxNameBytes).do();
+                const boxBytes = new Uint8Array(Buffer.from(boxValue.value, 'base64'));
 
-        const soteriaTxs = transactions
-            .map(tx => {
-                try {
-                    if (!tx.note) return null;
-                    
-                    // Properly decode the note
-                    let noteStr;
-                    if (typeof tx.note === 'string') {
-                        // Base64 string - decode it
-                        noteStr = atob(tx.note);
-                    } else if (tx.note instanceof Uint8Array || Array.isArray(tx.note)) {
-                        // Already bytes - convert to string
-                        noteStr = new TextDecoder().decode(new Uint8Array(tx.note));
-                    } else {
-                        console.warn('Unknown note format:', typeof tx.note);
-                        return null;
-                    }
-                    
-                    console.log('Decoded note:', noteStr);
-                    const note = JSON.parse(noteStr);
-                    
-                    if (note?.app_id === APP_ID) {
-                        console.log('✅ Found Soteria tx:', tx.id, 'action:', note.action);
-                        return { ...tx, noteData: note };
-                    }
-                } catch (e) {
-                    console.log('Failed to parse note:', e.message);
-                }
-                return null;
-            })
-            .filter(Boolean)
-            .sort((a, b) => b['round-time'] - a['round-time']);
+                // Parse the box data according to smartContract/contract.py
+                const recipient = parseAddress(boxBytes, 0);
+                const validFrom = parseUint64(boxBytes, 32);
+                const validUntil = parseUint64(boxBytes, 40);
+                const status = parseUint64(boxBytes, 48); // 1=ACTIVE, 0=REVOKED
 
-        console.log(`Found ${soteriaTxs.length} Soteria transactions`);
-        allTransactions = soteriaTxs;
-        renderLogsAndKeys(soteriaTxs);
+                allKeys.push({
+                    id: boxName,
+                    name: boxName.split('-')[0].replace(/_/g, ' '), // Recreate name from keyId
+                    recipient: recipient,
+                    validFrom: Number(validFrom) * 1000, // Convert to JS ms
+                    validUntil: Number(validUntil) * 1000, // Convert to JS ms
+                    status: Number(status)
+                });
+            } catch (e) {
+                 console.warn(`Failed to parse box '${boxName}':`, e);
+            }
+        }
+        
+        console.log(`Successfully parsed ${allKeys.length} keys`);
+        
+        // TODO: The new contract doesn't store general activity logs (lock/unlock)
+        // We will just render the keys for now. The activity log will be empty.
+        renderLogsAndKeys(allKeys);
+
     } catch (err) {
         console.error('Failed to fetch logs:', err);
         logContainer.innerHTML = `
             <div class="text-center mt-5">
                 <i class="bi bi-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
-                <p class="text-danger mt-3">Failed to load activity logs</p>
+                <p class="text-danger mt-3">Failed to load contract boxes</p>
                 <p class="text-secondary small">${err.message}</p>
                 <button class="btn btn-sm btn-outline-info" onclick="location.reload()">Retry</button>
             </div>`;
@@ -378,49 +405,35 @@ async function fetchActivityLogs() {
 }
 
 // Render Logs and Keys
-function renderLogsAndKeys(txs) {
-    console.log('Rendering logs and keys for', txs.length, 'transactions');
+function renderLogsAndKeys(keys) {
+    console.log('Rendering', keys.length, 'guest keys');
     
-    const guestKeys = {};
-    const revokedKeys = new Set();
-
-    // Process transactions to extract keys and revocations
-    txs.forEach(tx => {
-        const { action, revokes } = tx.noteData;
-        if (action === 'create_guest_key') {
-            guestKeys[tx.id] = tx;
-            console.log('Found guest key:', tx.id);
-        } else if (action === 'revoke_guest_key') {
-            revokedKeys.add(revokes);
-            console.log('Found revocation for:', revokes);
-        }
-    });
-
     // Render Guest Keys
-    const keyIds = Object.keys(guestKeys);
-    console.log('Rendering', keyIds.length, 'guest keys');
-    
-    if (keyIds.length > 0) {
-        guestKeyList.innerHTML = keyIds.map(id => 
-            createGuestKeyElement(guestKeys[id], revokedKeys.has(id))
-        ).join('');
+    if (keys.length > 0) {
+        // Sort keys by creation time (newest first), inferred from timestamp in keyId
+        keys.sort((a, b) => {
+            const timeA = a.id.split('-').pop() || 0;
+            const timeB = b.id.split('-').pop() || 0;
+            return timeB - timeA;
+        });
+
+        guestKeyList.innerHTML = keys.map(createGuestKeyElement).join('');
     } else {
         guestKeyList.innerHTML = '<p class="text-secondary text-center py-4">No guest keys created yet</p>';
     }
 
     // Render Activity Logs
-    console.log('Rendering', txs.length, 'activity log entries');
+    // NOTE: The new contract doesn't store a general activity log (like lock/unlock).
+    // We can either build one from the key data or leave it empty.
+    // For now, we'll show a "no activity" message.
+    console.log('Rendering 0 activity log entries (not supported by contract)');
     
-    if (txs.length > 0) {
-        logContainer.innerHTML = txs.map(createLogElement).join('');
-    } else {
-        logContainer.innerHTML = `
-            <div class="text-center" style="margin-top: 20vh;">
-                <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
-                <p class="text-secondary mt-3">No activity yet</p>
-                <p class="text-secondary small">Try unlocking/locking the door or creating a guest key</p>
-            </div>`;
-    }
+    logContainer.innerHTML = `
+        <div class="text-center" style="margin-top: 20vh;">
+            <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+            <p class="text-secondary mt-3">No activity log found</p>
+            <p class="text-secondary small">Key management is now handled by contract boxes.</p>
+        </div>`;
 }
 
 // Create Log Element HTML
@@ -506,76 +519,76 @@ function createLogElement(tx) {
 }
 
     // Create Guest Key Element HTML - WITH REVOKE BUTTON
-    function createGuestKeyElement(tx, isRevoked) {
-        const { details } = tx.noteData;
-        
-        // Check if key is expired
-        const now = Date.now();
-        const validUntil = new Date(details.validUntil).getTime();
-        const isExpired = now > validUntil;
-        
-        // Status badge
-        let statusBadge = '';
-        if (isRevoked) {
-            statusBadge = '<span class="badge bg-danger ms-2">Revoked</span>';
-        } else if (isExpired) {
-            statusBadge = '<span class="badge bg-secondary ms-2">Expired</span>';
-        } else {
-            statusBadge = '<span class="badge bg-success ms-2">Active</span>';
-        }
-        
-        const shortRecipient = `${details.recipient.substring(0, 8)}...${details.recipient.slice(-6)}`;
-        
-        const startDate = new Date(details.validFrom).toLocaleString();
-        const endDate = new Date(details.validUntil).toLocaleString();
-
-        return `
-            <div class="guest-key-item">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="flex-grow-1">
-                        <p class="mb-1 fw-semibold">
-                            <i class="bi bi-key me-1"></i>${details.name}${statusBadge}
-                        </p>
-                        <p class="mb-0 small text-secondary">
-                            <i class="bi bi-person me-1"></i>${shortRecipient}
-                        </p>
-                        <p class="mb-0 small text-secondary">
-                            <i class="bi bi-calendar-range me-1"></i>${startDate} → ${endDate}
-                        </p>
-                    </div>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-info" 
-                                onclick="window.showQRCode('${tx.id}')" 
-                                ${isRevoked || isExpired ? 'disabled' : ''}
-                                title="View QR Code">
-                            <i class="bi bi-qr-code"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" 
-                                onclick="window.revokeGuestKey('${tx.id}')" 
-                                ${isRevoked || isExpired ? 'disabled' : ''}
-                                title="Revoke Access">
-                            <i class="bi bi-x-circle"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>`;
+function createGuestKeyElement(key) {
+    // key object: { id, name, recipient, validFrom, validUntil, status }
+    
+    const now = Date.now();
+    const isRevoked = key.status === 0;
+    const isExpired = now > key.validUntil;
+    
+    // Status badge
+    let statusBadge = '';
+    if (isRevoked) {
+        statusBadge = '<span class="badge bg-danger ms-2">Revoked</span>';
+    } else if (isExpired) {
+        statusBadge = '<span class="badge bg-secondary ms-2">Expired</span>';
+    } else {
+        statusBadge = '<span class="badge bg-success ms-2">Active</span>';
     }
+    
+    const shortRecipient = `${key.recipient.substring(0, 8)}...${key.recipient.slice(-6)}`;
+    
+    const startDate = new Date(key.validFrom).toLocaleString();
+    const endDate = new Date(key.validUntil).toLocaleString();
+
+    return `
+        <div class="guest-key-item">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="flex-grow-1">
+                    <p class="mb-1 fw-semibold">
+                        <i class="bi bi-key me-1"></i>${key.name}${statusBadge}
+                    </p>
+                    <p class="mb-0 small text-secondary">
+                        <i class="bi bi-person me-1"></i>${shortRecipient}
+                    </p>
+                    <p class="mb-0 small text-secondary">
+                        <i class="bi bi-calendar-range me-1"></i>${startDate} → ${endDate}
+                    </p>
+                    <p class="mb-0 small text-secondary text-truncate" style="max-width: 200px;">
+                        <i class="bi bi-fingerprint me-1"></i>${key.id}
+                    </p>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-info" 
+                            onclick="window.showQRCode('${key.id}')" 
+                            ${isRevoked || isExpired ? 'disabled' : ''}
+                            title="View QR Code">
+                        <i class="bi bi-qr-code"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" 
+                            onclick="window.revokeGuestKey('${key.id}')" 
+                            ${isRevoked || isExpired ? 'disabled' : ''}
+                            title="Revoke Access">
+                        <i class="bi bi-x-circle"></i>
+                    </button>
+                </div>
+            </div>
+        </div>`;
+}
 
 // Display QR Code - FIXED TO MATCH BACKEND EXPECTATIONS
-function displayQRCode(txId) {
-    const tx = allTransactions.find(t => t.id === txId);
-    if (!tx) return;
-
-    const { details } = tx.noteData;
+function displayQRCode(keyId) {
+    const key = allKeys.find(k => k.id === keyId);
+    if (!key) {
+        console.error("Could not find key to display QR code for:", keyId);
+        return;
+    }
     
     // QR Code data structure - MUST MATCH what backend expects
     const qrData = JSON.stringify({
-        appId: APP_ID,              // backend checks this
-        keyId: txId,                // backend uses this to lookup transaction
-        keyName: details.name,       // for display purposes
-        validFrom: details.validFrom, // ISO 8601 timestamp
-        validUntil: details.validUntil // ISO 8601 timestamp
-        // NOTE: recipient is NOT in QR - backend fetches it from blockchain
+        appId: APP_ID,     // The numeric App ID
+        keyId: key.id,     // The string keyId (Box name)
+        keyName: key.name  // For display on the scanner side
     });
 
     console.log('='.repeat(60));
@@ -597,17 +610,19 @@ function displayQRCode(txId) {
     });
 
     // Display key details
-    const startDate = new Date(details.validFrom).toLocaleString();
-    const endDate = new Date(details.validUntil).toLocaleString();
-    const createdDate = new Date(tx.noteData.timestamp).toLocaleString();
+    const startDate = new Date(key.validFrom).toLocaleString();
+    const endDate = new Date(key.validUntil).toLocaleString();
+    
+    // We can estimate creation date from the keyId timestamp
+    const createdDate = new Date(parseInt(key.id.split('-').pop() || 0)).toLocaleString();
 
     document.getElementById('qr-key-details').innerHTML = `
-        <p class="mb-2"><strong><i class="bi bi-tag me-2"></i>Key Name:</strong> ${details.name}</p>
-        <p class="mb-2 text-break"><strong><i class="bi bi-person me-2"></i>Recipient:</strong> ${details.recipient}</p>
+        <p class="mb-2"><strong><i class="bi bi-tag me-2"></i>Key Name:</strong> ${key.name}</p>
+        <p class="mb-2 text-break"><strong><i class="bi bi-person me-2"></i>Recipient:</strong> ${key.recipient}</p>
         <p class="mb-2"><strong><i class="bi bi-calendar-check me-2"></i>Valid From:</strong> ${startDate}</p>
         <p class="mb-2"><strong><i class="bi bi-calendar-x me-2"></i>Valid Until:</strong> ${endDate}</p>
-        <p class="mb-2 small text-secondary"><strong><i class="bi bi-clock-history me-2"></i>Created:</strong> ${createdDate}</p>
-        <p class="mb-0 small text-secondary"><strong><i class="bi bi-fingerprint me-2"></i>Key ID:</strong> ${txId.substring(0, 16)}...</p>
+        <p class="mb-2 small text-secondary"><strong><i class="bi bi-clock-history me-2"></i>Created:</strong> ${createdDate} (Est.)</p>
+        <p class="mb-0 small text-secondary text-truncate"><strong><i class="bi bi-fingerprint me-2"></i>Key ID:</strong> ${key.id}</p>
         <div class="alert alert-info mt-3 mb-0 small">
             <i class="bi bi-info-circle me-2"></i>
             <strong>For Testing:</strong> Copy the JSON from browser console and paste in guest.html "Enter Code Manually"
@@ -680,68 +695,6 @@ function displayQRCode(txId) {
         await peraWallet.disconnect();
         userAccount = null;
         location.reload();
-    };
-
-    // Utility function to verify a key's current status (for testing/debugging)
-    window.verifyKeyStatus = async (txId) => {
-        console.log('=== Key Verification Debug ===');
-        const tx = allTransactions.find(t => t.id === txId);
-        if (!tx) {
-            console.error('Transaction not found');
-            return;
-        }
-
-        const { details } = tx.noteData;
-        
-        // Check 1: Authenticity (transaction exists on-chain)
-        console.log('✓ Authenticity: Transaction found on-chain');
-        console.log('  TX ID:', txId);
-        
-        // Check 2: Revocation status
-        const isRevoked = allTransactions.some(t => 
-            t.noteData.action === 'revoke_guest_key' && 
-            t.noteData.revokes === txId
-        );
-        console.log(isRevoked ? '✗ Revocation: Key has been revoked' : '✓ Revocation: Key is active');
-        
-        // Check 3: Time-lock validity
-        const now = Date.now();
-        const validFrom = new Date(details.validFrom).getTime();
-        const validUntil = new Date(details.validUntil).getTime();
-        const isTimeValid = now >= validFrom && now <= validUntil;
-        
-        console.log(isTimeValid ? '✓ Time-Lock: Currently valid' : '✗ Time-Lock: Outside validity window');
-        console.log('  Valid From:', new Date(validFrom).toLocaleString());
-        console.log('  Valid Until:', new Date(validUntil).toLocaleString());
-        console.log('  Current Time:', new Date(now).toLocaleString());
-        
-        // Final verdict
-        const shouldGrantAccess = !isRevoked && isTimeValid;
-        console.log('\n=== Final Verdict ===');
-        console.log(shouldGrantAccess ? '✓ ACCESS GRANTED' : '✗ ACCESS DENIED');
-        console.log('====================');
-        
-        return shouldGrantAccess;
-    };
-
-    // Export transaction data for backend testing (development helper)
-    window.exportKeyData = (txId) => {
-        const tx = allTransactions.find(t => t.id === txId);
-        if (!tx) {
-            console.error('Transaction not found');
-            return;
-        }
-
-        const exportData = {
-            transactionId: tx.id,
-            owner: userAccount,
-            noteData: tx.noteData,
-            roundTime: tx['round-time'],
-            confirmedRound: tx['confirmed-round']
-        };
-
-        console.log('Key Data Export:', JSON.stringify(exportData, null, 2));
-        return exportData;
     };
 
     console.log('Soteria Dashboard v' + APP_VERSION + ' initialized');
