@@ -23,7 +23,6 @@
 - [Setup & Installation](#setup--installation)
 - [Usage](#usage)
 - [Deployed Contracts](#deployed-contracts)
-- [Demo](#demo)
 - [Contributing](#contributing)
 
 ## 🏗️ Architecture
@@ -59,7 +58,7 @@
     └──────────┘              └────────────┘
          │                          │
     ┌────┴──────────────────────────┴────┐
-    │     Backend (Java)      │
+    │     Backend (Java)                 │
     │  • Physical lock control           │
     │  • Access logging                  │
     │  • Hardware integration            │
@@ -273,7 +272,7 @@ Contributions are welcome! Please:
 
 ## 👥 Authors
 
-- Ippili Tejeshwara Rao [shiobana17](https://github.com/shiobana17)
+- Ippili Tejeshwara Rao:[shiobana17](https://github.com/shiobana17)
 
 ## 🙏 Acknowledgments
 
