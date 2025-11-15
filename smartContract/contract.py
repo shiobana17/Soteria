@@ -1,4 +1,4 @@
-# smartContract/contract.py
+# smartContract/contract.py - FIXED VERSION (No MaybeValue Issues)
 from pyteal import *
 from typing import Literal
 
@@ -7,11 +7,7 @@ from beaker import (
     consts,
 )
 
-class SoteriaState:
-
-    pass
-
-app = Application("Soteria", state=SoteriaState())
+app = Application("Soteria")
 
 
 @app.external
@@ -21,113 +17,146 @@ def create_key(
     valid_from: abi.Uint64,
     valid_until: abi.Uint64,
 ):
+    """
+    Create a new guest access key stored in a box.
+    Only the contract creator (owner) can create keys.
+    """
     return Seq(
         # --- Security Checks ---
-        # Assert the sender is the app creator (the owner)
-        Assert(Txn.sender() == Global.creator_address()),
-        # Assert the key doesn't already exist
-        Assert(app.boxes[key_id.get()].exists() == Int(0)),
-        # Assert the times are valid
-        Assert(valid_from.get() < valid_until.get()),
-        Assert(valid_until.get() > Global.latest_timestamp()), # Can't create expired keys
+        Assert(Txn.sender() == Global.creator_address(), comment="Only owner can create keys"),
+        
+        # Validate times
+        Assert(valid_from.get() < valid_until.get(), comment="Start must be before end"),
+        Assert(valid_until.get() > Global.latest_timestamp(), comment="Cannot create expired key"),
 
-        # --- Store the Key Data ---
-        # 1. Create a new "Box" (storage space) named after the key_id
-        # We need 32 (addr) + 8 (time) + 8 (time) + 1 (status) = 49 bytes. Let's make it 64.
-        app.boxes[key_id.get()].create(Int(64)), 
-
-        # 2. Pack and store the data.
-        # We'll store:
-        # - recipient (32 bytes)
-        # - valid_from (8 bytes)
-        # - valid_until (8 bytes)
-        # - status (1 byte: 1=ACTIVE, 0=REVOKED)
+        # --- Create and Store the Key Data ---
+        # BoxCreate returns 1 if successful, 0 if already exists
+        Assert(BoxCreate(key_id.get(), Int(64)), comment="Key already exists"),
         
-        # Write recipient address at index 0
-        app.boxes[key_id.get()].replace(Int(0), recipient.get()),
+        # Write recipient address at offset 0
+        BoxReplace(key_id.get(), Int(0), recipient.get()),
         
-        # Write valid_from timestamp at index 32
-        app.boxes[key_id.get()].replace(Int(32), Itob(valid_from.get())),
+        # Write valid_from timestamp at offset 32
+        BoxReplace(key_id.get(), Int(32), Itob(valid_from.get())),
         
-        # Write valid_until timestamp at index 40
-        app.boxes[key_id.get()].replace(Int(40), Itob(valid_until.get())),
+        # Write valid_until timestamp at offset 40
+        BoxReplace(key_id.get(), Int(40), Itob(valid_until.get())),
         
-        # Write status (1 for ACTIVE) at index 48
-        app.boxes[key_id.get()].replace(Int(48), Int(1)),
+        # Write status byte at offset 48 (1 = ACTIVE)
+        BoxReplace(key_id.get(), Int(48), Itob(Int(1))),
     )
 
 
 @app.external
 def revoke_key(key_id: abi.String):
-
+    """
+    Revoke an existing guest access key.
+    Only the contract creator (owner) can revoke keys.
+    """
+    # We'll use a scratch var to temporarily store the box data
+    # This avoids the MaybeValue.hasValue() issue
+    temp = ScratchVar(TealType.bytes)
+    
     return Seq(
         # --- Security Checks ---
-        # Assert the sender is the app creator (the owner)
-        Assert(Txn.sender() == Global.creator_address()),
-        # Assert the key *does* exist
-        Assert(app.boxes[key_id.get()].exists() == Int(1)),
+        Assert(Txn.sender() == Global.creator_address(), comment="Only owner can revoke"),
         
-        # --- Update the Status ---
-        # Set the status byte (at index 48) to 0 (REVOKED)
-        app.boxes[key_id.get()].replace(Int(48), Int(0)),
+        # Read the box to verify it exists (will fail if it doesn't)
+        temp.store(BoxExtract(key_id.get(), Int(0), Int(1))),
+        
+        # --- Update Status ---
+        # Set status byte (at offset 48) to 0 (REVOKED)
+        BoxReplace(key_id.get(), Int(48), Itob(Int(0))),
     )
 
 
 @app.external(read_only=True)
 def verify_access(key_id: abi.String, *, output: abi.String):
-    
-    # Read the data from the box
-    box_data = app.boxes[key_id.get()].get()
-    
-    # Use ScratchVar to store values temporarily
+    """
+    Verify if a guest key is valid for access.
+    This is a read-only call that checks:
+    1. Key exists
+    2. Not revoked
+    3. Current time is within valid period
+    """
+    # Use ScratchVar to store extracted values
+    box_contents = ScratchVar(TealType.bytes)
     valid_from = ScratchVar(TealType.uint64)
     valid_until = ScratchVar(TealType.uint64)
     status = ScratchVar(TealType.uint64)
-
+    
     return Seq(
-        # --- Check 1: Does the key exist? ---
-        Assert(app.boxes[key_id.get()].exists() == Int(1), comment="Key must exist"),
-
-        # --- Unpack the data ---
-        # Get valid_from (8 bytes at index 32)
-        valid_from.store(Btoi(Extract(box_data, Int(32), Int(8)))),
-        # Get valid_until (8 bytes at index 40)
-        valid_until.store(Btoi(Extract(box_data, Int(40), Int(8)))),
-        # Get status (1 byte at index 48)
-        status.store(Btoi(Extract(box_data, Int(48), Int(1)))),
-
+        # --- Read the entire box (will fail if doesn't exist) ---
+        box_contents.store(BoxExtract(key_id.get(), Int(0), Int(64))),
+        
+        # --- Extract data from box ---
+        # Extract valid_from (8 bytes at offset 32)
+        valid_from.store(Btoi(Extract(box_contents.load(), Int(32), Int(8)))),
+        
+        # Extract valid_until (8 bytes at offset 40)
+        valid_until.store(Btoi(Extract(box_contents.load(), Int(40), Int(8)))),
+        
+        # Extract status (8 bytes at offset 48)
+        status.store(Btoi(Extract(box_contents.load(), Int(48), Int(8)))),
+        
         # --- Check 2: Is it revoked? ---
-        If(status.load() == Int(0),
-            Return(output.set("DENIED_REVOKED"))
+        If(
+            status.load() == Int(0),
+            output.set("DENIED_REVOKED"),
+            # --- Check 3: Time-Lock Validation ---
+            If(
+                Global.latest_timestamp() < valid_from.load(),
+                output.set("DENIED_NOT_YET_VALID"),
+                If(
+                    Global.latest_timestamp() > valid_until.load(),
+                    output.set("DENIED_EXPIRED"),
+                    # --- All checks passed! ---
+                    output.set("GRANTED")
+                )
+            )
         ),
-
-        # --- Check 3: Time-Lock ---
-        # This is MUCH more secure. It uses the blockchain's official time.
-        If(Global.latest_timestamp() < valid_from.load(),
-            Return(output.set("DENIED_NOT_YET_VALID"))
-        ),
-        If(Global.latest_timestamp() > valid_until.load(),
-            Return(output.set("DENIED_EXPIRED"))
-        ),
-
-        # --- All checks passed! ---
-        output.set("GRANTED")
     )
 
 
-# This is the boilerplate to build the contract
+# Build and export the contract
 if __name__ == "__main__":
     import json
     import os
 
-    # Create an 'artifacts' folder if it doesn't exist
+    print("=" * 60)
+    print("COMPILING SOTERIA SMART CONTRACT")
+    print("=" * 60)
+    print()
+
     artifacts_dir = "smartContract/artifacts"
     if not os.path.exists(artifacts_dir):
         os.makedirs(artifacts_dir)
+        print(f"✓ Created directory: {artifacts_dir}/")
 
-    # Build the application and export it to the artifacts folder
-    app.build().export(artifacts_dir)
-    
-    # Print a message
-    print(f"✅ Contract compiled! Check the '{artifacts_dir}' folder.")
-    print("   You'll find approval.teal, clear.teal, and abi.json")
+    try:
+        # Build and export
+        app_spec = app.build()
+        app_spec.export(artifacts_dir)
+
+        print(f"✅ Contract compiled successfully!")
+        print(f"   Output directory: {artifacts_dir}/")
+        print()
+        print("Files created:")
+        print(f"   ✓ approval.teal")
+        print(f"   ✓ clear.teal")
+        print(f"   ✓ abi.json")
+        print()
+        print("=" * 60)
+        print("NEXT STEP: Run deployment script")
+        print("=" * 60)
+        print("   python smartContract/deploy.py")
+        print("=" * 60)
+
+    except Exception as e:
+        print("=" * 60)
+        print("❌ COMPILATION FAILED")
+        print("=" * 60)
+        print(f"Error: {e}")
+        print()
+        import traceback
+        traceback.print_exc()

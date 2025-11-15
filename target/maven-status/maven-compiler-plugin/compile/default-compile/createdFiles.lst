@@ -1,4 +1,4 @@
-com/soteria/backend/SoteriaBackend$TransactionData.class
+com/soteria/backend/AccessLogger.class
 com/soteria/backend/SoteriaBackend$QRCodeData.class
 com/soteria/backend/LockController.class
 com/soteria/backend/VerificationResult.class

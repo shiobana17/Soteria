@@ -52,15 +52,15 @@ public class AccessLogger {
      * Log a successful guest access event to the blockchain
      * Creates a 0 ALGO transaction with access details in the note field
      * 
-     * @param keyId The transaction ID of the guest key used
+     * @param keyId The key ID used for access
      * @param keyName Name/description of the guest
      * @param ownerAddress Address of the property owner (transaction recipient)
      * @return Transaction ID of the logged access event
      */
     public String logAccessGranted(String keyId, String keyName, String ownerAddress) {
-        LOGGER.info("========================================");
+        LOGGER.info("=".repeat(60));
         LOGGER.info("LOGGING GUEST ACCESS TO BLOCKCHAIN");
-        LOGGER.info("========================================");
+        LOGGER.info("=".repeat(60));
         LOGGER.info("Guest: " + keyName);
         LOGGER.info("Key ID: " + keyId);
         LOGGER.info("Owner: " + ownerAddress);
@@ -72,7 +72,7 @@ public class AccessLogger {
             
             // Create access log data
             Map<String, Object> accessData = new HashMap<>();
-            accessData.put("app_id", config.getAppId());
+            accessData.put("app_id", config.getAppId());  // Now stores Long
             accessData.put("action", "guest_access");
             accessData.put("keyId", keyId);
             accessData.put("keyName", keyName);
@@ -109,7 +109,7 @@ public class AccessLogger {
             waitForConfirmation(txId);
             
             LOGGER.info("✓ Transaction confirmed");
-            LOGGER.info("========================================");
+            LOGGER.info("=".repeat(60));
             
             return txId;
             
@@ -125,16 +125,16 @@ public class AccessLogger {
      * Log a denied access attempt to the blockchain
      * Useful for security auditing
      * 
-     * @param keyId The transaction ID of the guest key attempted
+     * @param keyId The key ID attempted
      * @param keyName Name of the guest
      * @param ownerAddress Owner address
      * @param denialReason Why access was denied
      * @return Transaction ID or null if failed
      */
     public String logAccessDenied(String keyId, String keyName, String ownerAddress, String denialReason) {
-        LOGGER.info("========================================");
+        LOGGER.info("=".repeat(60));
         LOGGER.info("LOGGING ACCESS DENIAL TO BLOCKCHAIN");
-        LOGGER.info("========================================");
+        LOGGER.info("=".repeat(60));
         LOGGER.info("Guest: " + keyName);
         LOGGER.info("Reason: " + denialReason);
         
@@ -143,7 +143,7 @@ public class AccessLogger {
             TransactionParametersResponse params = paramsResponse.body();
             
             Map<String, Object> accessData = new HashMap<>();
-            accessData.put("app_id", config.getAppId());
+            accessData.put("app_id", config.getAppId());  // Now stores Long
             accessData.put("action", "guest_access_denied");
             accessData.put("keyId", keyId);
             accessData.put("keyName", keyName);
@@ -170,7 +170,7 @@ public class AccessLogger {
             
             String txId = submitResponse.body().txId;
             LOGGER.info("✓ Denial logged to blockchain: " + txId);
-            LOGGER.info("========================================");
+            LOGGER.info("=".repeat(60));
             
             return txId;
             

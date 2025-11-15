@@ -1,0 +1,104 @@
+{
+    "hints": {
+        "create_key(string,address,uint64,uint64)void": {
+            "call_config": {
+                "no_op": "CALL"
+            }
+        },
+        "revoke_key(string)void": {
+            "call_config": {
+                "no_op": "CALL"
+            }
+        },
+        "verify_access(string)string": {
+            "read_only": true,
+            "call_config": {
+                "no_op": "CALL"
+            }
+        }
+    },
+    "source": {
+        "approval": "I3ByYWdtYSB2ZXJzaW9uIDgKaW50Y2Jsb2NrIDAgMSA2NCA0OApieXRlY2Jsb2NrIDB4CnR4biBOdW1BcHBBcmdzCmludGNfMCAvLyAwCj09CmJueiBtYWluX2w4CnR4bmEgQXBwbGljYXRpb25BcmdzIDAKcHVzaGJ5dGVzIDB4NWIzZGFhOWMgLy8gImNyZWF0ZV9rZXkoc3RyaW5nLGFkZHJlc3MsdWludDY0LHVpbnQ2NCl2b2lkIgo9PQpibnogbWFpbl9sNwp0eG5hIEFwcGxpY2F0aW9uQXJncyAwCnB1c2hieXRlcyAweGM4ZDVhZmE1IC8vICJyZXZva2Vfa2V5KHN0cmluZyl2b2lkIgo9PQpibnogbWFpbl9sNgp0eG5hIEFwcGxpY2F0aW9uQXJncyAwCnB1c2hieXRlcyAweDNiZjlhOWEyIC8vICJ2ZXJpZnlfYWNjZXNzKHN0cmluZylzdHJpbmciCj09CmJueiBtYWluX2w1CmVycgptYWluX2w1Ogp0eG4gT25Db21wbGV0aW9uCmludGNfMCAvLyBOb09wCj09CnR4biBBcHBsaWNhdGlvbklECmludGNfMCAvLyAwCiE9CiYmCmFzc2VydApjYWxsc3ViIHZlcmlmeWFjY2Vzc2Nhc3Rlcl81CmludGNfMSAvLyAxCnJldHVybgptYWluX2w2Ogp0eG4gT25Db21wbGV0aW9uCmludGNfMCAvLyBOb09wCj09CnR4biBBcHBsaWNhdGlvbklECmludGNfMCAvLyAwCiE9CiYmCmFzc2VydApjYWxsc3ViIHJldm9rZWtleWNhc3Rlcl80CmludGNfMSAvLyAxCnJldHVybgptYWluX2w3Ogp0eG4gT25Db21wbGV0aW9uCmludGNfMCAvLyBOb09wCj09CnR4biBBcHBsaWNhdGlvbklECmludGNfMCAvLyAwCiE9CiYmCmFzc2VydApjYWxsc3ViIGNyZWF0ZWtleWNhc3Rlcl8zCmludGNfMSAvLyAxCnJldHVybgptYWluX2w4Ogp0eG4gT25Db21wbGV0aW9uCmludGNfMCAvLyBOb09wCj09CmJueiBtYWluX2wxMAplcnIKbWFpbl9sMTA6CnR4biBBcHBsaWNhdGlvbklECmludGNfMCAvLyAwCj09CmFzc2VydAppbnRjXzEgLy8gMQpyZXR1cm4KCi8vIGNyZWF0ZV9rZXkKY3JlYXRla2V5XzA6CnByb3RvIDQgMAp0eG4gU2VuZGVyCmdsb2JhbCBDcmVhdG9yQWRkcmVzcwo9PQovLyBPbmx5IG93bmVyIGNhbiBjcmVhdGUga2V5cwphc3NlcnQKZnJhbWVfZGlnIC0yCmZyYW1lX2RpZyAtMQo8Ci8vIFN0YXJ0IG11c3QgYmUgYmVmb3JlIGVuZAphc3NlcnQKZnJhbWVfZGlnIC0xCmdsb2JhbCBMYXRlc3RUaW1lc3RhbXAKPgovLyBDYW5ub3QgY3JlYXRlIGV4cGlyZWQga2V5CmFzc2VydApmcmFtZV9kaWcgLTQKZXh0cmFjdCAyIDAKaW50Y18yIC8vIDY0CmJveF9jcmVhdGUKLy8gS2V5IGFscmVhZHkgZXhpc3RzCmFzc2VydApmcmFtZV9kaWcgLTQKZXh0cmFjdCAyIDAKaW50Y18wIC8vIDAKZnJhbWVfZGlnIC0zCmJveF9yZXBsYWNlCmZyYW1lX2RpZyAtNApleHRyYWN0IDIgMApwdXNoaW50IDMyIC8vIDMyCmZyYW1lX2RpZyAtMgppdG9iCmJveF9yZXBsYWNlCmZyYW1lX2RpZyAtNApleHRyYWN0IDIgMApwdXNoaW50IDQwIC8vIDQwCmZyYW1lX2RpZyAtMQppdG9iCmJveF9yZXBsYWNlCmZyYW1lX2RpZyAtNApleHRyYWN0IDIgMAppbnRjXzMgLy8gNDgKaW50Y18xIC8vIDEKaXRvYgpib3hfcmVwbGFjZQpyZXRzdWIKCi8vIHJldm9rZV9rZXkKcmV2b2tla2V5XzE6CnByb3RvIDEgMAp0eG4gU2VuZGVyCmdsb2JhbCBDcmVhdG9yQWRkcmVzcwo9PQovLyBPbmx5IG93bmVyIGNhbiByZXZva2UKYXNzZXJ0CmZyYW1lX2RpZyAtMQpleHRyYWN0IDIgMAppbnRjXzAgLy8gMAppbnRjXzEgLy8gMQpib3hfZXh0cmFjdApzdG9yZSAwCmZyYW1lX2RpZyAtMQpleHRyYWN0IDIgMAppbnRjXzMgLy8gNDgKaW50Y18wIC8vIDAKaXRvYgpib3hfcmVwbGFjZQpyZXRzdWIKCi8vIHZlcmlmeV9hY2Nlc3MKdmVyaWZ5YWNjZXNzXzI6CnByb3RvIDEgMQpieXRlY18wIC8vICIiCmZyYW1lX2RpZyAtMQpleHRyYWN0IDIgMAppbnRjXzAgLy8gMAppbnRjXzIgLy8gNjQKYm94X2V4dHJhY3QKc3RvcmUgMQpsb2FkIDEKZXh0cmFjdCAzMiA4CmJ0b2kKc3RvcmUgMgpsb2FkIDEKZXh0cmFjdCA0MCA4CmJ0b2kKc3RvcmUgMwpsb2FkIDEKZXh0cmFjdCA0OCA4CmJ0b2kKaW50Y18wIC8vIDAKPT0KYm56IHZlcmlmeWFjY2Vzc18yX2w2Cmdsb2JhbCBMYXRlc3RUaW1lc3RhbXAKbG9hZCAyCjwKYm56IHZlcmlmeWFjY2Vzc18yX2w1Cmdsb2JhbCBMYXRlc3RUaW1lc3RhbXAKbG9hZCAzCj4KYm56IHZlcmlmeWFjY2Vzc18yX2w0CnB1c2hieXRlcyAweDAwMDc0NzUyNDE0ZTU0NDU0NCAvLyAweDAwMDc0NzUyNDE0ZTU0NDU0NApmcmFtZV9idXJ5IDAKYiB2ZXJpZnlhY2Nlc3NfMl9sNwp2ZXJpZnlhY2Nlc3NfMl9sNDoKcHVzaGJ5dGVzIDB4MDAwZTQ0NDU0ZTQ5NDU0NDVmNDU1ODUwNDk1MjQ1NDQgLy8gMHgwMDBlNDQ0NTRlNDk0NTQ0NWY0NTU4NTA0OTUyNDU0NApmcmFtZV9idXJ5IDAKYiB2ZXJpZnlhY2Nlc3NfMl9sNwp2ZXJpZnlhY2Nlc3NfMl9sNToKcHVzaGJ5dGVzIDB4MDAxNDQ0NDU0ZTQ5NDU0NDVmNGU0ZjU0NWY1OTQ1NTQ1ZjU2NDE0YzQ5NDQgLy8gMHgwMDE0NDQ0NTRlNDk0NTQ0NWY0ZTRmNTQ1ZjU5NDU1NDVmNTY0MTRjNDk0NApmcmFtZV9idXJ5IDAKYiB2ZXJpZnlhY2Nlc3NfMl9sNwp2ZXJpZnlhY2Nlc3NfMl9sNjoKcHVzaGJ5dGVzIDB4MDAwZTQ0NDU0ZTQ5NDU0NDVmNTI0NTU2NGY0YjQ1NDQgLy8gMHgwMDBlNDQ0NTRlNDk0NTQ0NWY1MjQ1NTY0ZjRiNDU0NApmcmFtZV9idXJ5IDAKdmVyaWZ5YWNjZXNzXzJfbDc6CnJldHN1YgoKLy8gY3JlYXRlX2tleV9jYXN0ZXIKY3JlYXRla2V5Y2FzdGVyXzM6CnByb3RvIDAgMApieXRlY18wIC8vICIiCmR1cAppbnRjXzAgLy8gMApkdXAKdHhuYSBBcHBsaWNhdGlvbkFyZ3MgMQpmcmFtZV9idXJ5IDAKdHhuYSBBcHBsaWNhdGlvbkFyZ3MgMgpmcmFtZV9idXJ5IDEKdHhuYSBBcHBsaWNhdGlvbkFyZ3MgMwpidG9pCmZyYW1lX2J1cnkgMgp0eG5hIEFwcGxpY2F0aW9uQXJncyA0CmJ0b2kKZnJhbWVfYnVyeSAzCmZyYW1lX2RpZyAwCmZyYW1lX2RpZyAxCmZyYW1lX2RpZyAyCmZyYW1lX2RpZyAzCmNhbGxzdWIgY3JlYXRla2V5XzAKcmV0c3ViCgovLyByZXZva2Vfa2V5X2Nhc3RlcgpyZXZva2VrZXljYXN0ZXJfNDoKcHJvdG8gMCAwCmJ5dGVjXzAgLy8gIiIKdHhuYSBBcHBsaWNhdGlvbkFyZ3MgMQpmcmFtZV9idXJ5IDAKZnJhbWVfZGlnIDAKY2FsbHN1YiByZXZva2VrZXlfMQpyZXRzdWIKCi8vIHZlcmlmeV9hY2Nlc3NfY2FzdGVyCnZlcmlmeWFjY2Vzc2Nhc3Rlcl81Ogpwcm90byAwIDAKYnl0ZWNfMCAvLyAiIgpkdXAKdHhuYSBBcHBsaWNhdGlvbkFyZ3MgMQpmcmFtZV9idXJ5IDEKZnJhbWVfZGlnIDEKY2FsbHN1YiB2ZXJpZnlhY2Nlc3NfMgpmcmFtZV9idXJ5IDAKcHVzaGJ5dGVzIDB4MTUxZjdjNzUgLy8gMHgxNTFmN2M3NQpmcmFtZV9kaWcgMApjb25jYXQKbG9nCnJldHN1Yg==",
+        "clear": "I3ByYWdtYSB2ZXJzaW9uIDgKcHVzaGludCAwIC8vIDAKcmV0dXJu"
+    },
+    "state": {
+        "global": {
+            "num_byte_slices": 0,
+            "num_uints": 0
+        },
+        "local": {
+            "num_byte_slices": 0,
+            "num_uints": 0
+        }
+    },
+    "schema": {
+        "global": {
+            "declared": {},
+            "reserved": {}
+        },
+        "local": {
+            "declared": {},
+            "reserved": {}
+        }
+    },
+    "contract": {
+        "name": "Soteria",
+        "methods": [
+            {
+                "name": "create_key",
+                "args": [
+                    {
+                        "type": "string",
+                        "name": "key_id"
+                    },
+                    {
+                        "type": "address",
+                        "name": "recipient"
+                    },
+                    {
+                        "type": "uint64",
+                        "name": "valid_from"
+                    },
+                    {
+                        "type": "uint64",
+                        "name": "valid_until"
+                    }
+                ],
+                "returns": {
+                    "type": "void"
+                },
+                "desc": "Create a new guest access key stored in a box.\nOnly the contract creator (owner) can create keys."
+            },
+            {
+                "name": "revoke_key",
+                "args": [
+                    {
+                        "type": "string",
+                        "name": "key_id"
+                    }
+                ],
+                "returns": {
+                    "type": "void"
+                },
+                "desc": "Revoke an existing guest access key.\nOnly the contract creator (owner) can revoke keys."
+            },
+            {
+                "name": "verify_access",
+                "args": [
+                    {
+                        "type": "string",
+                        "name": "key_id"
+                    }
+                ],
+                "returns": {
+                    "type": "string"
+                },
+                "desc": "Verify if a guest key is valid for access.\nThis is a read-only call that checks: 1. Key exists 2. Not revoked 3. Current time is within valid period"
+            }
+        ],
+        "networks": {}
+    },
+    "bare_call_config": {
+        "no_op": "CREATE"
+    }
+}

@@ -1,0 +1,239 @@
+#pragma version 8
+intcblock 0 1 64 48
+bytecblock 0x
+txn NumAppArgs
+intc_0 // 0
+==
+bnz main_l8
+txna ApplicationArgs 0
+pushbytes 0x5b3daa9c // "create_key(string,address,uint64,uint64)void"
+==
+bnz main_l7
+txna ApplicationArgs 0
+pushbytes 0xc8d5afa5 // "revoke_key(string)void"
+==
+bnz main_l6
+txna ApplicationArgs 0
+pushbytes 0x3bf9a9a2 // "verify_access(string)string"
+==
+bnz main_l5
+err
+main_l5:
+txn OnCompletion
+intc_0 // NoOp
+==
+txn ApplicationID
+intc_0 // 0
+!=
+&&
+assert
+callsub verifyaccesscaster_5
+intc_1 // 1
+return
+main_l6:
+txn OnCompletion
+intc_0 // NoOp
+==
+txn ApplicationID
+intc_0 // 0
+!=
+&&
+assert
+callsub revokekeycaster_4
+intc_1 // 1
+return
+main_l7:
+txn OnCompletion
+intc_0 // NoOp
+==
+txn ApplicationID
+intc_0 // 0
+!=
+&&
+assert
+callsub createkeycaster_3
+intc_1 // 1
+return
+main_l8:
+txn OnCompletion
+intc_0 // NoOp
+==
+bnz main_l10
+err
+main_l10:
+txn ApplicationID
+intc_0 // 0
+==
+assert
+intc_1 // 1
+return
+
+// create_key
+createkey_0:
+proto 4 0
+txn Sender
+global CreatorAddress
+==
+// Only owner can create keys
+assert
+frame_dig -2
+frame_dig -1
+<
+// Start must be before end
+assert
+frame_dig -1
+global LatestTimestamp
+>
+// Cannot create expired key
+assert
+frame_dig -4
+extract 2 0
+intc_2 // 64
+box_create
+// Key already exists
+assert
+frame_dig -4
+extract 2 0
+intc_0 // 0
+frame_dig -3
+box_replace
+frame_dig -4
+extract 2 0
+pushint 32 // 32
+frame_dig -2
+itob
+box_replace
+frame_dig -4
+extract 2 0
+pushint 40 // 40
+frame_dig -1
+itob
+box_replace
+frame_dig -4
+extract 2 0
+intc_3 // 48
+intc_1 // 1
+itob
+box_replace
+retsub
+
+// revoke_key
+revokekey_1:
+proto 1 0
+txn Sender
+global CreatorAddress
+==
+// Only owner can revoke
+assert
+frame_dig -1
+extract 2 0
+intc_0 // 0
+intc_1 // 1
+box_extract
+store 0
+frame_dig -1
+extract 2 0
+intc_3 // 48
+intc_0 // 0
+itob
+box_replace
+retsub
+
+// verify_access
+verifyaccess_2:
+proto 1 1
+bytec_0 // ""
+frame_dig -1
+extract 2 0
+intc_0 // 0
+intc_2 // 64
+box_extract
+store 1
+load 1
+extract 32 8
+btoi
+store 2
+load 1
+extract 40 8
+btoi
+store 3
+load 1
+extract 48 8
+btoi
+intc_0 // 0
+==
+bnz verifyaccess_2_l6
+global LatestTimestamp
+load 2
+<
+bnz verifyaccess_2_l5
+global LatestTimestamp
+load 3
+>
+bnz verifyaccess_2_l4
+pushbytes 0x00074752414e544544 // 0x00074752414e544544
+frame_bury 0
+b verifyaccess_2_l7
+verifyaccess_2_l4:
+pushbytes 0x000e44454e4945445f45585049524544 // 0x000e44454e4945445f45585049524544
+frame_bury 0
+b verifyaccess_2_l7
+verifyaccess_2_l5:
+pushbytes 0x001444454e4945445f4e4f545f5945545f56414c4944 // 0x001444454e4945445f4e4f545f5945545f56414c4944
+frame_bury 0
+b verifyaccess_2_l7
+verifyaccess_2_l6:
+pushbytes 0x000e44454e4945445f5245564f4b4544 // 0x000e44454e4945445f5245564f4b4544
+frame_bury 0
+verifyaccess_2_l7:
+retsub
+
+// create_key_caster
+createkeycaster_3:
+proto 0 0
+bytec_0 // ""
+dup
+intc_0 // 0
+dup
+txna ApplicationArgs 1
+frame_bury 0
+txna ApplicationArgs 2
+frame_bury 1
+txna ApplicationArgs 3
+btoi
+frame_bury 2
+txna ApplicationArgs 4
+btoi
+frame_bury 3
+frame_dig 0
+frame_dig 1
+frame_dig 2
+frame_dig 3
+callsub createkey_0
+retsub
+
+// revoke_key_caster
+revokekeycaster_4:
+proto 0 0
+bytec_0 // ""
+txna ApplicationArgs 1
+frame_bury 0
+frame_dig 0
+callsub revokekey_1
+retsub
+
+// verify_access_caster
+verifyaccesscaster_5:
+proto 0 0
+bytec_0 // ""
+dup
+txna ApplicationArgs 1
+frame_bury 1
+frame_dig 1
+callsub verifyaccess_2
+frame_bury 0
+pushbytes 0x151f7c75 // 0x151f7c75
+frame_dig 0
+concat
+log
+retsub

@@ -14,7 +14,6 @@
         from: function(data, encoding) {
           if (typeof data === 'string') {
             if (encoding === 'base64') {
-              // Decode base64
               const binaryString = atob(data);
               const bytes = new Uint8Array(binaryString.length);
               for (let i = 0; i < binaryString.length; i++) {
@@ -33,6 +32,8 @@
       };
     </script>
     
+    <!-- IMPORTANT: Load config FIRST -->
+    <script src="./config.js"></script>
     <script src="https://unpkg.com/algosdk@2.7.0/dist/browser/algosdk.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
@@ -85,10 +86,13 @@
 
                         <!-- Status Messages -->
                         <div id="status-area"></div>
+                        
+                        <!-- Door Controls (shown after verification) -->
+                        <div id="door-controls-area"></div>
                     </div>
                 </div>
             </div>
-            <!----
+
             <div class="col-lg-4">
                 <div class="card glass-card">
                     <div class="card-body">
@@ -96,21 +100,21 @@
                             <i class="bi bi-info-circle me-2"></i>How It Works
                         </h2>
                         <ol class="text-secondary" style="line-height: 2;">
-                            <li>The owner creates a guest access key for you</li>
-                            <li>They send you a QR code (via text, email, etc.)</li>
+                            <li>Owner creates a guest key using smart contract</li>
+                            <li>You receive a QR code (via text, email, etc.)</li>
                             <li>Scan the QR code with this interface</li>
-                            <li>The system verifies your key on the blockchain</li>
+                            <li>Smart contract verifies your key on-chain</li>
                             <li>If valid, access is granted!</li>
                         </ol>
                         
                         <div class="alert alert-info mt-4">
                             <i class="bi bi-shield-check me-2"></i>
-                            <strong>Secure & Trustless</strong><br>
-                            <small>All verification happens on the Algorand blockchain. No one can fake or forge access keys.</small>
+                            <strong>Secure & Decentralized</strong><br>
+                            <small>Verification happens via Algorand smart contract. Keys cannot be forged.</small>
                         </div>
                     </div>
                 </div>
-            -->
+
                 <!-- Recent Scans -->
                 <div class="card glass-card mt-4">
                     <div class="card-body">

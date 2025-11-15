@@ -14,6 +14,14 @@
   window.Buffer = {
     from: function(data, encoding) {
       if (typeof data === 'string') {
+        if (encoding === 'base64') {
+          const binaryString = atob(data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          return bytes;
+        }
         const encoder = new TextEncoder();
         return encoder.encode(data);
       }
@@ -31,6 +39,8 @@
   };
 </script>
 
+<!-- IMPORTANT: Load config BEFORE other scripts -->
+<script src="./config.js"></script>
 <script src="https://unpkg.com/algosdk@2.7.0/dist/browser/algosdk.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="./pera-wallet-connect.js"></script>
@@ -95,7 +105,7 @@
                     <div class="card glass-card">
                         <div class="card-body">
                             <h2 class="h5 fw-bold mb-3">
-                                <i class="bi bi-key me-2"></i>Guest Access (NFT Keys)
+                                <i class="bi bi-key me-2"></i>Guest Access Keys
                             </h2>
                             <div id="guest-key-list" class="scrollbar-custom" style="max-height: 400px; overflow-y: auto;">
                                 <p class="text-secondary text-center py-4">No guest keys created yet</p>
@@ -115,7 +125,7 @@
                     <div class="card-body d-flex flex-column">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
                             <h2 class="h5 fw-bold mb-0">
-                                <i class="bi bi-journal-text me-2"></i>Immutable Activity Log
+                                <i class="bi bi-journal-text me-2"></i>Smart Contract Keys
                             </h2>
                             <span class="badge network-badge">
                                 <i class="bi bi-link-45deg"></i> Algorand TestNet
@@ -124,7 +134,7 @@
                         <div id="log-container" class="flex-grow-1 scrollbar-custom" style="overflow-y: auto; max-height: 75vh;">
                             <div id="log-placeholder" class="text-center" style="margin-top: 20vh;">
                                 <i class="bi bi-wallet2" style="font-size: 3rem; opacity: 0.3;"></i>
-                                <p class="text-secondary mt-3">Connect your wallet to view activity</p>
+                                <p class="text-secondary mt-3">Connect your wallet to view keys</p>
                             </div>
                         </div>
                     </div>
@@ -139,7 +149,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold">
-                        <i class="bi bi-key me-2"></i>Create Guest Access NFT
+                        <i class="bi bi-key me-2"></i>Create Guest Access Key
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>

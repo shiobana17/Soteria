@@ -1,0 +1,57 @@
+{
+    "name": "Soteria",
+    "methods": [
+        {
+            "name": "create_key",
+            "args": [
+                {
+                    "type": "string",
+                    "name": "key_id"
+                },
+                {
+                    "type": "address",
+                    "name": "recipient"
+                },
+                {
+                    "type": "uint64",
+                    "name": "valid_from"
+                },
+                {
+                    "type": "uint64",
+                    "name": "valid_until"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "Create a new guest access key stored in a box.\nOnly the contract creator (owner) can create keys."
+        },
+        {
+            "name": "revoke_key",
+            "args": [
+                {
+                    "type": "string",
+                    "name": "key_id"
+                }
+            ],
+            "returns": {
+                "type": "void"
+            },
+            "desc": "Revoke an existing guest access key.\nOnly the contract creator (owner) can revoke keys."
+        },
+        {
+            "name": "verify_access",
+            "args": [
+                {
+                    "type": "string",
+                    "name": "key_id"
+                }
+            ],
+            "returns": {
+                "type": "string"
+            },
+            "desc": "Verify if a guest key is valid for access.\nThis is a read-only call that checks: 1. Key exists 2. Not revoked 3. Current time is within valid period"
+        }
+    ],
+    "networks": {}
+}

@@ -1,0 +1,7 @@
+DEPLOYER ACCOUNT (TestNet Only - DO NOT USE FOR MAINNET)
+============================================================
+Address: TT6OX3HEARM6E4SJKHEMDJ4O7446C5T4R4OMVYNW3LICEQAZTKOSO4HMLA
+Mnemonic: neglect oven then wild congress rubber better ramp food corn second profit increase funny brick stone truly pipe blossom flock network scrub car absorb board
+============================================================
+
+WARNING: Delete this file after deployment!
